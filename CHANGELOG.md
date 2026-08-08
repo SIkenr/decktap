@@ -2,6 +2,25 @@
 
 All notable DeckTap desktop changes are recorded here. The project is currently distributing unsigned test builds; entries describe development milestones rather than signed public releases.
 
+## [Unreleased]
+
+## [1.0.5](https://github.com/SIkenr/decktap/releases/tag/v1.0.5) - 2026-08-08
+
+### Added
+
+- Continuous monitoring of the remembered presentation rule, with automatic rebinding when one playback window reappears after editing.
+- Real local application icons for the five built-in quick targets.
+
+### Fixed
+
+- PowerPoint and WPS editor windows are no longer selected as page-turn targets when a dedicated slideshow process or playback window is required.
+- Phone controls remain blocked while DeckTap is waiting for a replacement playback window, preventing keys from reaching the editor or another foreground application.
+
+### Test builds
+
+- Published unsigned Windows x64 portable and macOS ARM64 cross-built archives with SHA-256 checksum files.
+- Built from source commit `f24c6c4a17a40f9ac72d030a39d833031432d256`; see the [test-build guide](./docs/TEST-BUILDS.md) for verification and platform limitations.
+
 ## [1.0.4] - 2026-08-08
 
 ### Added

@@ -22,6 +22,7 @@ import loggerModule from '../client/logger.js';
 import mediaTargetsModule from '../client/media-targets.js';
 import preferencesModule from '../client/preferences.js';
 import targetWindowModule from '../client/target-window.js';
+import targetMonitorModule from '../client/target-monitor.js';
 import trustedClientStoreModule from '../client/trusted-client-store.js';
 import trayControllerModule from '../client/tray-controller.js';
 import windowAdapterModule from '../client/window-adapter.js';
@@ -35,11 +36,13 @@ const { createLogger } = loggerModule;
 const {
   createMediaTargetService,
   findBuiltInRule,
+  findBuiltInRuleById,
   findCustomRule,
   QUICK_TARGET_RULE_IDS,
 } = mediaTargetsModule;
 const { createPreferencesStore, PAGE_TURN_MODES, THEME_SOURCES } = preferencesModule;
 const { createTargetWindowController } = targetWindowModule;
+const { createTargetMonitor } = targetMonitorModule;
 const { createTrustedClientStore } = trustedClientStoreModule;
 const { createTrayController } = trayControllerModule;
 const { createPlatformWindowAdapter } = windowAdapterModule;
@@ -51,6 +54,7 @@ let mediaTargetService = null;
 let preferencesStore = null;
 let service = null;
 let targetWindowController = null;
+let targetMonitor = null;
 let trustedClientStore = null;
 let trayController = null;
 let unsubscribeService = null;
@@ -104,7 +108,9 @@ function rememberTargetRule(target, explicitRuleId = null) {
 
 async function restoreLastLockedTarget() {
   const ruleId = preferencesStore.get().lastLockedAppId;
-  if (!ruleId || (process.platform === 'darwin' && getPermissionStatus() !== 'granted')) return;
+  if (!ruleId) return;
+  targetWindowController.arm();
+  if (process.platform === 'darwin' && getPermissionStatus() !== 'granted') return;
   try {
     const result = await mediaTargetService.lockRule(ruleId);
     logger.child('media-targets').info(
@@ -115,13 +121,23 @@ async function restoreLastLockedTarget() {
       { outcome: result.outcome, ruleId },
     );
   } catch (error) {
-    if (error instanceof TypeError) preferencesStore.setLastLockedAppId(null);
+    if (error instanceof TypeError) {
+      preferencesStore.setLastLockedAppId(null);
+      targetWindowController.clear();
+    }
     logger.child('media-targets').warn(
       'media.target.restore-failed',
       'The previous media application could not be restored at startup.',
       { error, ruleId },
     );
   }
+}
+
+function getRememberedTargetName(ruleId, customApps) {
+  if (!ruleId) return null;
+  return findBuiltInRuleById(ruleId)?.displayName
+    || customApps.find((rule) => rule.id === ruleId)?.displayName
+    || null;
 }
 
 function createSnapshot() {
@@ -161,11 +177,13 @@ function createSnapshot() {
     },
     target: (() => {
       const target = targetWindowController?.getTarget() || null;
+      const ruleId = preferences.lastLockedAppId;
+      const controllerStatus = targetWindowController?.getStatus() || 'unconfigured';
       return {
-        appName: target?.appName || null,
-        focusProtection: Boolean(target),
-        ruleId: target ? preferences.lastLockedAppId : null,
-        status: targetWindowController?.getStatus() || 'unconfigured',
+        appName: target?.appName || getRememberedTargetName(ruleId, preferences.customApps),
+        focusProtection: Boolean(target || ruleId),
+        ruleId,
+        status: !target && ruleId ? 'waiting' : controllerStatus,
       };
     })(),
     theme: {
@@ -304,6 +322,8 @@ function registerIpcHandlers() {
       systemPreferences.isTrustedAccessibilityClient(true);
       throw new Error('Accessibility permission is required before locking an application window.');
     }
+    preferencesStore.setLastLockedAppId(safeRuleId);
+    targetWindowController.arm();
     const result = await mediaTargetService.lockRule(safeRuleId);
     if (result.outcome === 'locked') {
       rememberTargetRule(result.target, result.ruleId);
@@ -574,8 +594,38 @@ async function initialize() {
     logger: logger.child('lan-service'),
     trustedClientStore,
   });
+  targetMonitor = createTargetMonitor({
+    mediaTargetService,
+    targetWindowController,
+    getRuleId: () => preferencesStore.get().lastLockedAppId,
+    canMonitor: () => process.platform !== 'darwin' || getPermissionStatus() === 'granted',
+    onRebound: ({ ruleId }) => {
+      logger.child('media-targets').info(
+        'media.target.auto-rebound',
+        'A presentation playback window was automatically locked after it appeared.',
+        { ruleId },
+      );
+      broadcastSnapshot();
+      service.broadcastControllerConfig();
+    },
+    onWaiting: ({ outcome, ruleId }) => {
+      logger.child('media-targets').debug(
+        'media.target.monitor-waiting',
+        'The target monitor is waiting for one unambiguous playback window.',
+        { outcome, ruleId },
+      );
+      broadcastSnapshot();
+      service.broadcastControllerConfig();
+    },
+    onError: (error, ruleId) => logger.child('media-targets').warn(
+      'media.target.monitor-failed',
+      'The target monitor could not inspect presentation windows.',
+      { error, ruleId },
+    ),
+  });
   unsubscribeService = service.subscribe(broadcastSnapshot);
   await restoreLastLockedTarget();
+  targetMonitor.start();
 
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
@@ -643,6 +693,7 @@ app.on('before-quit', (event) => {
       { error },
     ))
     .finally(() => {
+      targetMonitor?.stop();
       unsubscribeService?.();
       trayController?.destroy();
       logger?.close();

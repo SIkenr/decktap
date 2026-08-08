@@ -111,7 +111,7 @@ function createLanService(options = {}) {
       serverTime: now(),
     };
     if (config.target && typeof config.target === 'object') {
-      const status = ['unconfigured', 'locked', 'lost'].includes(config.target.status)
+      const status = ['unconfigured', 'waiting', 'locked', 'lost'].includes(config.target.status)
         ? config.target.status
         : 'unconfigured';
       normalized.target = {

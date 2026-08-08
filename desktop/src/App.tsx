@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 
+import keynoteIcon from './assets/app-icons/keynote.png';
+import perfectCastIcon from './assets/app-icons/perfectcast.png';
+import powerPointIcon from './assets/app-icons/powerpoint.png';
+import proPresenterIcon from './assets/app-icons/propresenter.svg';
+import wpsIcon from './assets/app-icons/wps.svg';
+
 import type {
   AppSnapshot,
   DiagnosticLogLevel,
@@ -47,11 +53,11 @@ const DEVICE_HISTORY_REASON = {
 } as const;
 
 const QUICK_TARGET_APPS = [
-  { id: 'keynote', label: 'Keynote', mark: 'K', tone: 'keynote' },
-  { id: 'powerpoint', label: 'PowerPoint', mark: 'P', tone: 'powerpoint' },
-  { id: 'wps-presentation', label: 'WPS', mark: 'W', tone: 'wps' },
-  { id: 'propresenter', label: 'ProPresenter', mark: 'Pr', tone: 'propresenter' },
-  { id: 'perfectcast', label: '极演投影', mark: '极', tone: 'perfectcast' },
+  { id: 'keynote', label: 'Keynote', icon: keynoteIcon, tone: 'keynote' },
+  { id: 'powerpoint', label: 'PowerPoint', icon: powerPointIcon, tone: 'powerpoint' },
+  { id: 'wps-presentation', label: 'WPS', icon: wpsIcon, tone: 'wps' },
+  { id: 'propresenter', label: 'ProPresenter', icon: proPresenterIcon, tone: 'propresenter' },
+  { id: 'perfectcast', label: '极演投影', icon: perfectCastIcon, tone: 'perfectcast' },
 ] as const;
 
 function Logo() {
@@ -292,7 +298,7 @@ function ControlsPage({
             <h2>焦点保护</h2>
           </div>
           <span className={`mini-status ${snapshot.target.status === 'locked' ? 'success' : 'warning'}`}>
-            {snapshot.target.status === 'locked' ? '已保护' : snapshot.target.status === 'lost' ? '目标丢失' : '未锁定'}
+            {snapshot.target.status === 'locked' ? '已保护' : snapshot.target.status === 'waiting' ? '持续监控中' : snapshot.target.status === 'lost' ? '目标丢失' : '未锁定'}
           </span>
         </div>
         <div className="control-mapping-list">
@@ -301,7 +307,7 @@ function ControlsPage({
           <div><span>当前软件</span><strong>{snapshot.target.appName || '电脑当前前台窗口'}</strong></div>
         </div>
         <p className="settings-description">
-          锁定目标后，DeckTap 只会在焦点恢复并验证成功时发送按键；目标丢失时手机控制会自动停用。
+          锁定目标后，DeckTap 只会在焦点恢复并验证成功时发送按键；放映窗口关闭时会停用手机按键并持续等待自动恢复。
         </p>
       </section>
     </div>
@@ -644,6 +650,7 @@ function TargetPage({
   const discovery = snapshot.mediaTargets;
   const targetLocked = snapshot.target.status === 'locked';
   const targetLost = snapshot.target.status === 'lost';
+  const targetWaiting = snapshot.target.status === 'waiting';
   const scanTitle = discovery.status === 'single-candidate'
     ? '检测到一个建议目标'
     : discovery.status === 'multiple-candidates'
@@ -659,17 +666,19 @@ function TargetPage({
             <h2>{snapshot.target.appName || '尚未锁定控制软件'}</h2>
           </div>
           <span className={`mini-status ${targetLocked ? 'success' : 'warning'}`}>
-            {targetLocked ? '焦点保护已开启' : targetLost ? '目标已丢失' : '等待选择'}
+            {targetLocked ? '焦点保护已开启' : targetWaiting ? '等待放映窗口' : targetLost ? '目标已丢失' : '等待选择'}
           </span>
         </div>
         <p className="target-page-description">
           {targetLocked
             ? '每次翻页前都会恢复并验证此窗口焦点。'
+            : targetWaiting
+              ? '正在持续监控放映进程；开始播放后会自动锁定，等待期间不会发送按键。'
             : targetLost
-              ? '目标窗口已关闭或无法聚焦，没有向其他窗口发送按键。'
+              ? '目标窗口已关闭或无法聚焦，没有向其他窗口发送按键，并会继续等待放映恢复。'
               : '扫描已知软件，或从全部运行窗口中添加自定义软件。'}
         </p>
-        {targetLocked && (
+        {snapshot.target.focusProtection && (
           <button className="secondary-button" type="button" disabled={busy} onClick={onClearTarget}>
             解除当前锁定
           </button>
@@ -792,7 +801,8 @@ function HomePage({
   const statusText = snapshot.serviceError?.message || (isRunning ? '运行正常，暂无错误' : '服务当前未运行');
   const targetLocked = snapshot.target.status === 'locked';
   const targetLost = snapshot.target.status === 'lost';
-  const targetStatusText = targetLocked ? '已锁定' : targetLost ? '目标已丢失' : '尚未配置';
+  const targetWaiting = snapshot.target.status === 'waiting';
+  const targetStatusText = targetLocked ? '已锁定' : targetWaiting ? '监控放映中' : targetLost ? '目标已丢失' : '尚未配置';
 
   return (
     <div className="dashboard-grid">
@@ -867,12 +877,12 @@ function HomePage({
 
         <div className="quick-target-heading">
           <strong>快捷锁定</strong>
-          <span>点击正在运行的演示软件</span>
+          <span>选择软件后持续监控放映窗口</span>
         </div>
 
         <div className="quick-target-grid" aria-label="快捷锁定播放或演示软件">
           {QUICK_TARGET_APPS.map((app) => {
-            const active = targetLocked && snapshot.target.ruleId === app.id;
+            const active = snapshot.target.ruleId === app.id;
             return (
               <button
                 key={app.id}
@@ -882,9 +892,9 @@ function HomePage({
                 disabled={busy}
                 onClick={() => onQuickLockTarget(app.id)}
               >
-                <span className={`quick-target-icon ${app.tone}`} aria-hidden="true">{app.mark}</span>
+                <span className={`quick-target-icon ${app.tone}`} aria-hidden="true"><img src={app.icon} alt="" /></span>
                 <span>{app.label}</span>
-                <small>{active ? '已锁定' : '快捷锁定'}</small>
+                <small>{active ? targetLocked ? '已锁定' : '监控中' : '快捷锁定'}</small>
               </button>
             );
           })}
@@ -900,11 +910,11 @@ function HomePage({
           </button>
         </div>
 
-        <div className={`quick-target-status ${targetLost ? 'lost' : targetLocked ? 'locked' : ''}`} aria-live="polite">
-          <span aria-hidden="true">{targetLost ? '!' : targetLocked ? '✓' : '◎'}</span>
+        <div className={`quick-target-status ${targetWaiting ? 'waiting' : targetLost ? 'lost' : targetLocked ? 'locked' : ''}`} aria-live="polite">
+          <span aria-hidden="true">{targetWaiting ? '◌' : targetLost ? '!' : targetLocked ? '✓' : '◎'}</span>
           <div>
             <strong>{snapshot.target.appName || (targetLost ? '历史目标已丢失' : '尚未锁定软件')}</strong>
-            <small>{targetLost ? '已停止发送按键，请重新选择' : targetLocked ? '软件失焦时将自动恢复窗口焦点' : '未运行的软件不会被锁定'}</small>
+            <small>{targetWaiting ? '持续监控放映进程，开始播放后自动锁定' : targetLost ? '已停止发送按键，正在等待放映恢复' : targetLocked ? '软件失焦时将自动恢复窗口焦点' : '未运行的软件不会被锁定'}</small>
           </div>
           {snapshot.target.focusProtection && (
             <button className="text-button danger-text" type="button" disabled={busy} onClick={onClearTarget}>解除</button>
@@ -1109,9 +1119,6 @@ export function App() {
       setSnapshot(result.snapshot);
       if (result.outcome === 'multiple') {
         setActivePage('target');
-      } else if (result.outcome === 'not-running') {
-        const appName = QUICK_TARGET_APPS.find((app) => app.id === ruleId)?.label || '该软件';
-        setActionError(`未检测到正在运行的 ${appName}，请先启动软件后重试。`);
       }
     } catch {
       setActionError('快捷锁定未完成，请检查软件是否运行及系统权限。');

@@ -13,8 +13,13 @@ const BUILTIN_MEDIA_APPS = Object.freeze([
   {
     id: 'powerpoint',
     displayName: 'Microsoft PowerPoint',
-    appNames: ['powerpnt', 'microsoft powerpoint'],
+    appNames: ['powerpnt', 'microsoft powerpoint', 'pptview'],
     bundleIds: ['com.microsoft.powerpoint'],
+    playback: {
+      appNames: ['pptview'],
+      windowClasses: ['screenclass'],
+      titleFragments: ['powerpoint slide show', 'slide show', '幻灯片放映', '投影片放映'],
+    },
   },
   {
     id: 'keynote',
@@ -25,8 +30,21 @@ const BUILTIN_MEDIA_APPS = Object.freeze([
   {
     id: 'wps-presentation',
     displayName: 'WPS Presentation',
-    appNames: ['wpp', 'wps', 'wps office', 'wps presentation'],
+    appNames: [
+      'wpp',
+      'wps',
+      'wps office',
+      'wps presentation',
+      'wppshow',
+      'wpsshow',
+      'wppplay',
+    ],
     bundleIds: ['com.kingsoft.wpsoffice.mac', 'com.kingsoft.wpsoffice'],
+    playback: {
+      appNames: ['wppshow', 'wpsshow', 'wppplay'],
+      windowClassFragments: ['wppscreen', 'wppshow', 'wpsscreen', 'wpsshow'],
+      titleFragments: ['slide show', '幻灯片放映', '投影片放映', '放映 - wps'],
+    },
   },
   {
     id: 'propresenter',
@@ -85,8 +103,33 @@ function matchesIdentity(window, rule) {
   );
 }
 
+function includesNormalized(values, candidate) {
+  return Boolean(candidate && values?.some((value) => normalizeIdentity(value) === candidate));
+}
+
+function containsNormalized(values, candidate) {
+  return Boolean(candidate && values?.some((value) => candidate.includes(normalizeIdentity(value))));
+}
+
+function matchesPlaybackWindow(window, rule) {
+  if (!rule.playback) return true;
+  const appName = normalizeIdentity(window.appName);
+  const windowClass = normalizeIdentity(window.windowClass);
+  const title = normalizeIdentity(window.title);
+  return Boolean(
+    includesNormalized(rule.playback.appNames, appName)
+    || includesNormalized(rule.playback.windowClasses, windowClass)
+    || containsNormalized(rule.playback.windowClassFragments, windowClass)
+    || (window.platform === 'darwin' && containsNormalized(rule.playback.titleFragments, title)),
+  );
+}
+
+function matchesRuleWindow(window, rule) {
+  return matchesIdentity(window, rule) && matchesPlaybackWindow(window, rule);
+}
+
 function findBuiltInRule(window) {
-  return BUILTIN_MEDIA_APPS.find((rule) => matchesIdentity(window, rule)) || null;
+  return BUILTIN_MEDIA_APPS.find((rule) => matchesRuleWindow(window, rule)) || null;
 }
 
 function findBuiltInRuleById(ruleId) {
@@ -236,7 +279,7 @@ function createMediaTargetService(options = {}) {
     try {
       const windows = (await adapter.listWindows()).slice(0, MAX_CANDIDATES);
       const matching = windows.filter((window) => (
-        customRule ? findCustomRule(window, [customRule]) : matchesIdentity(window, builtInRule)
+        customRule ? findCustomRule(window, [customRule]) : matchesRuleWindow(window, builtInRule)
       ));
       candidateWindows = new Map();
       const recognition = customRule
@@ -264,10 +307,33 @@ function createMediaTargetService(options = {}) {
     }
   }
 
+  async function rebindRule(ruleId, rebindOptions = {}) {
+    const builtInRule = findBuiltInRuleById(ruleId);
+    const customRule = getCustomApps().find((rule) => rule.id === ruleId) || null;
+    if (!builtInRule && !customRule) throw new TypeError('Unsupported media application rule');
+
+    const windows = (await adapter.listWindows()).slice(0, MAX_CANDIDATES);
+    const matching = windows.filter((window) => (
+      customRule ? findCustomRule(window, [customRule]) : matchesRuleWindow(window, builtInRule)
+    ));
+    if (matching.length !== 1) {
+      return Object.freeze({
+        outcome: matching.length === 0 ? 'not-running' : 'multiple',
+        ruleId,
+      });
+    }
+    if (typeof rebindOptions.shouldLock === 'function' && !rebindOptions.shouldLock()) {
+      return Object.freeze({ outcome: 'cancelled', ruleId });
+    }
+    await targetWindowController.lock(matching[0]);
+    return Object.freeze({ outcome: 'locked', ruleId, target: targetWindowController.getTarget() });
+  }
+
   return {
     createCustomApp,
     getSnapshot: () => snapshot,
     lockRule,
+    rebindRule,
     scan,
     selectCandidate,
   };
@@ -281,6 +347,8 @@ module.exports = {
   findBuiltInRule,
   findBuiltInRuleById,
   findCustomRule,
+  matchesPlaybackWindow,
+  matchesRuleWindow,
   normalizeIdentity,
   QUICK_TARGET_RULE_IDS,
 };

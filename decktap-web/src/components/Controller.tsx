@@ -71,20 +71,25 @@ export function Controller() {
   const previousArrow = pageTurnMode === 'vertical' ? '↑' : '←';
   const nextArrow = pageTurnMode === 'vertical' ? '↓' : '→';
   const targetLost = controllerTarget.status === 'lost';
-  const controlsDisabled = !isPaired || targetLost;
+  const targetWaiting = controllerTarget.status === 'waiting';
+  const controlsDisabled = !isPaired || targetLost || targetWaiting;
   const targetText = controllerTarget.status === 'locked'
     ? `已锁定 ${controllerTarget.appName || '演示软件'}`
+    : targetWaiting
+      ? `正在监控 ${controllerTarget.appName || '演示软件'} 的放映窗口`
     : controllerTarget.status === 'lost'
       ? '控制目标已丢失，请在电脑端重新选择'
       : '未锁定目标，将控制电脑当前前台窗口';
   const targetHint = controllerTarget.status === 'locked'
     ? '每次翻页前会先恢复该窗口焦点'
+    : targetWaiting
+      ? '开始放映后会自动锁定；等待期间不会发送按键'
     : controllerTarget.status === 'lost'
       ? '为避免误操作，当前不会发送按键'
       : '建议在电脑端锁定演示或媒体窗口';
   const targetSymbol = controllerTarget.status === 'locked'
     ? '✓'
-    : controllerTarget.status === 'lost' ? '!' : '◎';
+    : targetWaiting ? '◌' : controllerTarget.status === 'lost' ? '!' : '◎';
 
   if (!isPaired) {
     const codeEntryEnabled = pairingStage === 'code-required' || pairingStage === 'submitting';

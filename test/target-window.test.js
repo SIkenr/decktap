@@ -61,6 +61,40 @@ test('target window controller locks a selected available candidate', async () =
   assert.deepEqual(controller.getTarget(), candidate);
 });
 
+test('armed focus protection blocks keys while waiting for a replacement window', async () => {
+  const controller = createTargetWindowController({
+    adapter: {
+      async captureActiveWindow() { return null; },
+      async activateWindow() { return true; },
+    },
+  });
+
+  controller.arm();
+  assert.equal(controller.getStatus(), 'waiting');
+  assert.equal(controller.getTarget(), null);
+  await assert.rejects(
+    () => controller.ensureFocused(),
+    (error) => error.code === 'TARGET_NOT_AVAILABLE',
+  );
+});
+
+test('availability checks mark a closed target as lost for automatic rebinding', async () => {
+  let available = true;
+  const controller = createTargetWindowController({
+    adapter: {
+      async captureActiveWindow() { return null; },
+      async isWindowAvailable() { return available; },
+      async activateWindow() { return true; },
+    },
+  });
+
+  await controller.lock({ id: 'show-window', processId: 12 });
+  assert.equal(await controller.checkAvailability(), true);
+  available = false;
+  assert.equal(await controller.checkAvailability(), false);
+  assert.equal(controller.getStatus(), 'lost');
+});
+
 test('target window controller rejects a missing captured window', async () => {
   const controller = createTargetWindowController({
     adapter: {
