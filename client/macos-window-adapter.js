@@ -33,6 +33,7 @@ function run(argv) {
       processId: processId,
       appName: String(safely(function () { return process.name(); }, 'Unknown application')),
       bundleId: String(safely(function () { return process.bundleIdentifier(); }, '')),
+      windowClass: String(safely(function () { return window.subrole(); }, '')),
       title: String(safely(function () { return window.name(); }, '')),
       platform: 'darwin'
     };
@@ -105,6 +106,7 @@ function sanitizeWindow(value) {
     processId,
     appName: String(value.appName || 'Unknown application').slice(0, 160),
     bundleId: String(value.bundleId || '').slice(0, 256),
+    windowClass: String(value.windowClass || '').slice(0, 160),
     title: String(value.title || '').slice(0, 512),
     platform: 'darwin',
   });

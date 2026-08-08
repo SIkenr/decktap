@@ -283,6 +283,11 @@
   color: var(--success);
 }
 
+.target-card.waiting .target-card-icon {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .target-card.lost .target-card-icon {
   background: var(--danger-soft);
   color: var(--danger);

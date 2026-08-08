@@ -31,6 +31,7 @@ test('Windows adapter normalizes window results and delegates focus operations',
 
   assert.deepEqual(await adapter.captureActiveWindow(), {
     ...capturedWindow,
+    windowClass: '',
     platform: 'win32',
   });
   assert.equal((await adapter.listWindows()).length, 1);
@@ -83,6 +84,7 @@ test('macOS adapter keeps bundle identity and rejects malformed window results',
   assert.deepEqual(await adapter.captureActiveWindow(), {
     ...capturedWindow,
     bundleId: 'com.microsoft.Powerpoint',
+    windowClass: '',
     platform: 'darwin',
   });
   assert.deepEqual(await adapter.listWindows(), []);

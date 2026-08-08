@@ -6,7 +6,7 @@ interface ConnectionStatus {
 }
 
 export type ControllerPageTurnMode = 'vertical' | 'horizontal';
-export type ControllerTargetStatus = 'unconfigured' | 'locked' | 'lost';
+export type ControllerTargetStatus = 'unconfigured' | 'waiting' | 'locked' | 'lost';
 
 export interface ControllerTarget {
   appName: string | null;
@@ -32,7 +32,7 @@ const PAIRING_STORAGE_KEY = 'decktap.pairingToken';
 const AUTH_FAILURE_CODES = new Set([4001, 4002, 4003, 4004, 4008]);
 
 const COMMAND_ERROR_TEXT: Record<string, string> = {
-  'target-lost': '控制目标已关闭，请在电脑上重新选择',
+  'target-lost': '放映窗口尚未就绪，电脑端正在自动监控',
   'focus-failed': '无法恢复目标窗口焦点，本次没有发送按键',
   'keyboard-unavailable': '电脑端键盘控制不可用，请检查权限或重新启动',
   'control-failed': '电脑没有完成本次操作，请查看电脑端日志',
@@ -222,6 +222,7 @@ export function useWebSocket() {
           && message.target !== null
           && 'status' in message.target
           && (message.target.status === 'unconfigured'
+            || message.target.status === 'waiting'
             || message.target.status === 'locked'
             || message.target.status === 'lost')
         ) {

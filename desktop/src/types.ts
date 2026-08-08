@@ -77,7 +77,7 @@ export interface AppSnapshot {
     appName: string | null;
     focusProtection: boolean;
     ruleId: string | null;
-    status: 'unconfigured' | 'locked' | 'lost';
+    status: 'unconfigured' | 'waiting' | 'locked' | 'lost';
   };
   theme: {
     effective: EffectiveTheme;

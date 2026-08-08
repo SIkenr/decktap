@@ -28,6 +28,7 @@ public static class DeckTapWindowApi {
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
   [DllImport("user32.dll")] public static extern int GetWindowTextLengthW(IntPtr hWnd);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowTextW(IntPtr hWnd, StringBuilder text, int maxCount);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetClassNameW(IntPtr hWnd, StringBuilder className, int maxCount);
   [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
@@ -52,12 +53,15 @@ function Get-WindowData([IntPtr]$Handle) {
   $length = [DeckTapWindowApi]::GetWindowTextLengthW($Handle)
   $builder = [Text.StringBuilder]::new([Math]::Max(1, $length + 1))
   [void][DeckTapWindowApi]::GetWindowTextW($Handle, $builder, $builder.Capacity)
+  $classBuilder = [Text.StringBuilder]::new(256)
+  [void][DeckTapWindowApi]::GetClassNameW($Handle, $classBuilder, $classBuilder.Capacity)
   $process = Get-Process -Id $nativeProcessId -ErrorAction SilentlyContinue
 
   return [ordered]@{
     id = $Handle.ToInt64().ToString()
     processId = [int]$nativeProcessId
     appName = if ($process) { $process.ProcessName } else { 'Unknown application' }
+    windowClass = $classBuilder.ToString()
     title = $builder.ToString()
     platform = 'win32'
   }
@@ -139,6 +143,7 @@ function sanitizeWindow(value) {
     id: id.slice(0, 128),
     processId,
     appName: String(value.appName || 'Unknown application').slice(0, 160),
+    windowClass: String(value.windowClass || '').slice(0, 160),
     title: String(value.title || '').slice(0, 512),
     platform: 'win32',
   });

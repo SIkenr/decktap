@@ -5,7 +5,7 @@
 📡 DeckTap is a lightweight local-network remote for controlling presentations.  
 Use your phone to wirelessly control PowerPoint, Keynote, PDF slideshows — no app installation needed.
 
-Current test version: **1.0.4**. See [CHANGELOG.md](./CHANGELOG.md) for release history and [docs/TEST-BUILDS.md](./docs/TEST-BUILDS.md) for unsigned package instructions.
+Current test version: **1.0.5**. [Download the unsigned test builds](https://github.com/SIkenr/decktap/releases/tag/v1.0.5), see [CHANGELOG.md](./CHANGELOG.md) for release history, and read [docs/TEST-BUILDS.md](./docs/TEST-BUILDS.md) before launching them.
 
 ---
 
@@ -140,7 +140,7 @@ Keyboard commands are delivered to the foreground application. The desktop clien
 
 Windows window activation uses a fixed PowerShell command backed by Win32 window APIs. macOS uses the system `osascript` JavaScript bridge and System Events, which can request Accessibility and Automation permission. Both adapters keep process and window identifiers in the Electron main process.
 
-The home screen provides six quick target tiles for Keynote, PowerPoint, WPS, ProPresenter, PerfectCast (极演投影), and a custom application. Clicking a built-in tile scans with that application's preset rules and locks it when exactly one matching window is found; ambiguous matches are shown for explicit selection. The custom tile opens **Control target**, where an unrecognized window can be locked temporarily or saved as a custom rule. On startup, DeckTap checks the most recently locked built-in or custom rule and restores it only when exactly one window matches.
+The home screen provides six quick target tiles for Keynote, PowerPoint, WPS, ProPresenter, PerfectCast (极演投影), and a custom application. Clicking a built-in tile remembers that application's preset rule and locks it when exactly one matching playback window is found; ambiguous matches are shown for explicit selection. PowerPoint and WPS editor windows are excluded from their playback rules. The custom tile opens **Control target**, where an unrecognized window can be locked temporarily or saved as a custom rule. DeckTap continuously monitors the remembered rule: if editing closes the slideshow window, phone keys are blocked until one matching playback window reappears and is automatically locked.
 
 The **Control target** page also supports broader discovery with built-in rules for the five quick targets plus Acrobat Reader, Preview, VLC, IINA, and PotPlayer. The renderer receives only opaque temporary candidate IDs and safe display labels; native handles, process IDs, bundle IDs, and raw window titles remain in the main process. DeckTap does not continuously steal focus when no command is being sent.
 
@@ -176,13 +176,13 @@ The **Log diagnostics** page reads only DeckTap's fixed active and rotated log f
 
 ## 🖱️ Distribution status
 
-Version 1.0.4 has unsigned portable test packages for Windows x64 and macOS ARM64. They are intended for controlled testing, not public release:
+Version 1.0.5 has unsigned portable test packages for Windows x64 and macOS ARM64. They are intended for controlled testing, not public release:
 
-- Windows: portable ZIP; no Authenticode signature or installer.
-- macOS: Linux cross-built `.app`; no Developer ID signature or notarization and requires local ad-hoc signing before testing.
+- Windows: [portable ZIP](https://github.com/SIkenr/decktap/releases/download/v1.0.5/DeckTap-1.0.5-test-win32-x64-portable-unsigned.zip); no Authenticode signature or installer.
+- macOS: [Apple Silicon ZIP](https://github.com/SIkenr/decktap/releases/download/v1.0.5/DeckTap-1.0.5-test-macos-arm64-crossbuilt-unsigned.zip); Linux cross-built `.app`, with no Developer ID signature or notarization, requiring local ad-hoc signing before testing.
 - Both platforms still require real-device verification of startup, native keyboard control, target focus recovery, pairing, firewall/permissions, tray behavior, and clean exit.
 
-Build locally with `npm run package`, or run `npm run make` when creating Forge distributables on the target operating system. Follow [the test-build guide](./docs/TEST-BUILDS.md) before launching an unsigned package. Public macOS releases must be built on macOS, signed with Developer ID, hardened, and notarized; public Windows releases should be Authenticode-signed.
+The [v1.0.5 pre-release](https://github.com/SIkenr/decktap/releases/tag/v1.0.5) includes SHA-256 checksum files for both archives and was prepared from source commit `f24c6c4`. Build locally with `npm run package`, or run `npm run make` when creating Forge distributables on the target operating system. Follow [the test-build guide](./docs/TEST-BUILDS.md) before launching an unsigned package. Public macOS releases must be built on macOS, signed with Developer ID, hardened, and notarized; public Windows releases should be Authenticode-signed.
 
 ---
 

@@ -12,8 +12,17 @@ const powerPointWindow = {
   id: 'window-powerpoint',
   processId: 10,
   appName: 'POWERPNT',
+  windowClass: 'screenClass',
   title: 'Confidential quarterly plan',
   platform: 'win32',
+};
+
+const powerPointEditorWindow = {
+  ...powerPointWindow,
+  id: 'window-powerpoint-editor',
+  processId: 9,
+  windowClass: 'PPTFrameClass',
+  title: 'Confidential quarterly plan - PowerPoint',
 };
 
 const notesWindow = {
@@ -58,20 +67,61 @@ test('built-in media rules recognize common presentation applications', () => {
     appName: 'Keynote',
     bundleId: 'com.apple.Keynote',
     platform: 'darwin',
+    title: 'PowerPoint Slide Show - Quarterly review',
   })?.id, 'keynote');
-  assert.equal(findBuiltInRule({ ...powerPointWindow, appName: 'wpp' })?.id, 'wps-presentation');
+  assert.equal(findBuiltInRule({ ...powerPointWindow, appName: 'wppshow', windowClass: '' })?.id, 'wps-presentation');
   assert.equal(findBuiltInRule({ ...powerPointWindow, appName: 'ProPresenter' })?.id, 'propresenter');
   assert.equal(findBuiltInRule({ ...powerPointWindow, appName: 'PerfectCast' })?.id, 'perfectcast');
   assert.equal(findBuiltInRule(notesWindow), null);
+  assert.equal(findBuiltInRule(powerPointEditorWindow), null);
 });
 
 test('quick rule locks a single running application and preserves its rule identity', async () => {
-  const { locked, service } = createService([notesWindow, powerPointWindow]);
+  const { locked, service } = createService([notesWindow, powerPointEditorWindow, powerPointWindow]);
   const result = await service.lockRule('powerpoint');
 
   assert.equal(result.outcome, 'locked');
   assert.equal(result.ruleId, 'powerpoint');
   assert.equal(result.target.appName, 'POWERPNT');
+  assert.deepEqual(locked, [powerPointWindow]);
+});
+
+test('PowerPoint and WPS editor windows are excluded from playback targeting', async () => {
+  const wpsEditor = {
+    ...powerPointEditorWindow,
+    id: 'wps-editor',
+    appName: 'wpp',
+    windowClass: 'Qt5152QWindowIcon',
+  };
+  const wpsPlayback = {
+    ...powerPointWindow,
+    id: 'wps-playback',
+    appName: 'wppshow',
+    windowClass: '',
+  };
+  const { locked, service } = createService([
+    powerPointEditorWindow,
+    powerPointWindow,
+    wpsEditor,
+    wpsPlayback,
+  ]);
+
+  assert.equal((await service.lockRule('powerpoint')).outcome, 'locked');
+  assert.equal(locked.at(-1).id, powerPointWindow.id);
+  assert.equal((await service.lockRule('wps-presentation')).outcome, 'locked');
+  assert.equal(locked.at(-1).id, wpsPlayback.id);
+});
+
+test('remembered rule rebinds only after one playback window appears', async () => {
+  const windows = [powerPointEditorWindow];
+  const { locked, service } = createService(windows);
+
+  assert.equal((await service.rebindRule('powerpoint')).outcome, 'not-running');
+  windows.push(powerPointWindow);
+  const result = await service.rebindRule('powerpoint');
+
+  assert.equal(result.outcome, 'locked');
+  assert.equal(result.target.id, powerPointWindow.id);
   assert.deepEqual(locked, [powerPointWindow]);
 });
 

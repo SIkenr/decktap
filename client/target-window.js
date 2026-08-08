@@ -55,6 +55,24 @@ function createTargetWindowController(options = {}) {
     return target;
   }
 
+  function arm() {
+    target = null;
+    setStatus('waiting');
+  }
+
+  async function checkAvailability() {
+    if (!target) return false;
+    if (typeof adapter.isWindowAvailable !== 'function') return true;
+    let available = false;
+    try {
+      available = await adapter.isWindowAvailable(target);
+    } catch {
+      available = false;
+    }
+    if (!available) setStatus('lost');
+    return available;
+  }
+
   function fail(code, message, options) {
     setStatus('lost');
     throw new TargetWindowError(code, message, options);
@@ -62,6 +80,12 @@ function createTargetWindowController(options = {}) {
 
   async function ensureFocused() {
     if (!target) {
+      if (status === 'waiting' || status === 'lost') {
+        fail(
+          'TARGET_NOT_AVAILABLE',
+          'The selected presentation application is waiting for a playback window.',
+        );
+      }
       return { status: 'unlocked', target: null };
     }
 
@@ -121,7 +145,9 @@ function createTargetWindowController(options = {}) {
   }
 
   return {
+    arm,
     captureCurrent,
+    checkAvailability,
     clear: () => {
       target = null;
       setStatus('unconfigured');

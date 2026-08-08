@@ -433,11 +433,18 @@ button:disabled {
   box-shadow: var(--shadow-soft);
 }
 
-.quick-target-icon.keynote { background: linear-gradient(145deg, #38a7ff, #176bd6); }
-.quick-target-icon.powerpoint { background: linear-gradient(145deg, #e96b42, #b6371f); }
-.quick-target-icon.wps { background: linear-gradient(145deg, #ef4d5b, #c51e31); }
-.quick-target-icon.propresenter { background: linear-gradient(145deg, #825bf2, #5230b9); font-size: 13px; }
-.quick-target-icon.perfectcast { background: linear-gradient(145deg, #23b79a, #087c70); }
+.quick-target-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+}
+
+.quick-target-icon.keynote,
+.quick-target-icon.powerpoint,
+.quick-target-icon.propresenter { background: transparent; }
+.quick-target-icon.wps { padding: 5px 3px; background: white; }
+.quick-target-icon.perfectcast { padding: 7px; background: linear-gradient(145deg, #23b79a, #087c70); }
 .quick-target-icon.custom { background: linear-gradient(145deg, var(--text-muted), var(--text-secondary)); font-size: 24px; }
 
 .quick-target-status {
@@ -467,6 +474,11 @@ button:disabled {
 .quick-target-status.locked > span {
   background: var(--success-soft);
   color: var(--success);
+}
+
+.quick-target-status.waiting > span {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .quick-target-status.lost > span {
