@@ -1,147 +1,80 @@
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
-const { keyboard, Key } = require("@nut-tree/nut-js");
-const os = require('os');
+const path = require('node:path');
 const qrcode = require('qrcode-terminal');
-const path = require('path');
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-const port = 9999;
+const { createKeyboardController } = require('./keyboard');
+const { createLanService } = require('./lan-service');
+const { createLogger } = require('./logger');
 
-const staticPath = path.join(__dirname, '..', 'decktap-web', 'dist');
+function parsePort(value) {
+  if (value === undefined) return 9999;
 
-console.log('📂 Static files path:', staticPath);
-app.use(express.static(staticPath));
-
-// WebSocket 连接处理
-wss.on('connection', (ws) => {
-  console.log('📲 Mobile phone controller connected');
-  ws.on('message', (message) => {
-    const msg = message.toString();
-    console.log('🔍 Received message:', msg);
-    if (msg === 'next') {
-      try {     
-        (async () => {
-            await keyboard.pressKey(Key.Right);
-            await keyboard.releaseKey(Key.Right);
-        })();
-      } catch (error) {
-        console.error('❌ Key simulation failed:', error);
-      }
-    } else if (msg === 'prev') {
-      try {   
-        (async () => {
-            await keyboard.pressKey(Key.Left);
-            await keyboard.releaseKey(Key.Left);
-        })();
-      } catch (error) {
-        console.error('❌ Key simulation failed:', error);
-      }
-    } else {
-      console.log('❌ Unknown message type:', msg);
-    }
-  });
-
-  ws.on('error', (error) => {
-    console.error('❌ WebSocket error:', error);
-  });
-
-  ws.on('close', () => {
-    console.log('🔌 The phone controller has been disconnected');
-  });
-});
-
-server.listen(port, () => {
-  const controlUrl = `http://${getLocalIP()}:${port}`;
-  console.log(`\n✅ DeckTap LAN service has been started：${controlUrl}`);
-  console.log('\n🔗 Please open the above link with your mobile phone under the same Wi-Fi, or scan the QR code below:\n');
-  qrcode.generate(controlUrl, { small: true });
-});
-
-process.on('SIGINT', () => {
-    ioHook.unload();
-    ioHook.stop();
-    process.exit();
-  });
-
-function getLocalIP() {
-  const interfaces = os.networkInterfaces();
-  console.log('🔍 Scanning the network interface......');
-  
-  // 存储所有找到的 IP 地址
-  const ipAddresses = [];
-  
-  for (let [name, iface] of Object.entries(interfaces)) {
-    for (let config of iface) {
-      if (config.family === 'IPv4' && !config.internal) {
-        // 检查是否是有效的单播地址（不是网络地址或广播地址）
-        const ipParts = config.address.split('.').map(Number);
-        const lastOctet = ipParts[3];
-        if (lastOctet !== 0 && lastOctet !== 255) {  // 排除网络地址和广播地址
-          console.log(`📡 Discover network interfaces: ${name}`);
-          console.log(`   IP Address: ${config.address}`);
-          console.log(`   Subnet Mask: ${config.netmask}`);
-          ipAddresses.push({
-            name,
-            address: config.address,
-            netmask: config.netmask,
-            // 添加优先级分数
-            priority: getPriorityScore(config.address, name)
-          });
-        }
-      }
-    }
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new Error(`Invalid PORT value: ${value}`);
   }
 
-  // 按优先级排序
-  ipAddresses.sort((a, b) => b.priority - a.priority);
-  
-  if (ipAddresses.length > 0) {
-    const selectedIP = ipAddresses[0];
-    console.log(`✅ Choose Local IP: ${selectedIP.address} (${selectedIP.name})`);
-    return selectedIP.address;
-  }
-
-  console.log('❌ No available network interface was found, use localhost');
-  return 'localhost';
+  return port;
 }
 
-// 计算 IP 地址的优先级分数
-function getPriorityScore(address, interfaceName) {
-  let score = 0;
-  
-  // 优先选择常见的本地网络接口名称
-  if (interfaceName.includes('en0') || interfaceName.includes('wlan0')) {
-    score += 100;
-  }
-  
-  // 优先选择 192.168.x.x 地址（最常见的本地网络）
-  if (address.startsWith('192.168.')) {
-    score += 50;
-  }
-  
-  // 优先选择 172.16.x.x - 172.31.x.x 地址
-  if (address.startsWith('172.')) {
-    const secondOctet = parseInt(address.split('.')[1]);
-    if (secondOctet >= 16 && secondOctet <= 31) {
-      score += 40;
-    }
-  }
-  
-  // 优先选择 10.x.x.x 地址
-  if (address.startsWith('10.')) {
-    score += 30;
-  }
-  
-  // 排除一些特殊的网络接口
-  if (interfaceName.includes('vmnet') || 
-      interfaceName.includes('docker') || 
-      interfaceName.includes('veth')) {
-    score -= 100;
-  }
-  
-  return score;
+function createDefaultLogger() {
+  return createLogger({
+    level: process.env.DECKTAP_LOG_LEVEL || 'info',
+    logDir: process.env.DECKTAP_LOG_DIR || path.join(process.cwd(), 'logs'),
+  });
 }
+
+async function main(options = {}) {
+  const logger = options.logger || createDefaultLogger();
+  const appLogger = logger.child('cli');
+  appLogger.info('app.starting', 'DeckTap is starting.', { nodeVersion: process.version });
+
+  const service = createLanService({
+    port: parsePort(process.env.PORT),
+    staticPath: path.join(__dirname, '..', 'decktap-web', 'dist'),
+    keyboardController: createKeyboardController(),
+    logger: logger.child('lan-service'),
+  });
+
+  let shuttingDown = false;
+  const shutdown = async (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
+    appLogger.info('app.signal.received', 'DeckTap received a shutdown signal.', { signal });
+    console.log(`\n🛑 Received ${signal}; stopping DeckTap...`);
+    try {
+      await service.stop();
+      appLogger.info('app.stopped', 'DeckTap stopped cleanly.', { signal });
+      logger.close();
+    } catch (error) {
+      appLogger.error('app.stop.failed', 'DeckTap failed to stop cleanly.', { error, signal });
+      console.error('❌ Failed to stop DeckTap cleanly:', error);
+      process.exitCode = 1;
+    }
+  };
+
+  process.once('SIGINT', () => void shutdown('SIGINT'));
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+
+  const info = await service.start();
+  appLogger.info('app.started', 'DeckTap is ready for controller connections.', {
+    port: info.port,
+    interfaceName: info.interfaceName,
+  });
+
+  console.log(`\n✅ DeckTap LAN service has started: ${info.controlUrl}`);
+  console.log('\n🔗 Open this URL on a phone connected to the same Wi-Fi, or scan the QR code:\n');
+  qrcode.generate(info.controlUrl, { small: true });
+}
+
+if (require.main === module) {
+  const logger = createDefaultLogger();
+  main({ logger }).catch((error) => {
+    logger.child('cli').error('app.start.failed', 'DeckTap failed to start.', { error });
+    console.error('❌ DeckTap failed to start:', error);
+    logger.close();
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { createDefaultLogger, main, parsePort };

@@ -140,5 +140,9 @@ dist
 decktap-linux
 decktap-win.exe
 decktap-macos
+out/
+.vite/
+.build-cache/
+artifacts/
 
 .DS_Store
