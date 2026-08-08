@@ -4,16 +4,14 @@ import type { FC } from 'react';
 interface ConnectionStatusProps {
   status: {
     text: string;
-    color: string;
+    tone: 'neutral' | 'warning' | 'success' | 'error';
   };
 }
 
 export const ConnectionStatus: FC<ConnectionStatusProps> = ({ status }) => {
   return (
-    <div 
-      className="status"
-      style={{ color: status.color }}
-    >
+    <div className={`connection-pill ${status.tone}`} role="status" aria-live="polite">
+      <span className="connection-dot" aria-hidden="true" />
       {status.text}
     </div>
   );

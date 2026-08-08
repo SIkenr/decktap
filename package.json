@@ -1,6 +1,6 @@
 {
   "name": "decktap",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "📡 DeckTap is a lightweight local-network remote for controlling presentations.   Use your phone to wirelessly control PowerPoint, Keynote, PDF slideshows — no app installation needed.",
   "homepage": "https://github.com/Rico00121/decktap#readme",
   "bugs": {
@@ -12,35 +12,46 @@
   },
   "author": "Rico",
   "type": "commonjs",
-  "main": "client/lan.js",
+  "productName": "DeckTap",
+  "main": ".vite/build/main.js",
+  "private": true,
   "scripts": {
-    "start": "node client/lan.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm run build:web && npm run typecheck:desktop",
+    "build:web": "npm --prefix decktap-web run build",
+    "lint": "npm --prefix decktap-web run lint && npm run typecheck:desktop",
+    "make": "npm run build:web && electron-forge make",
+    "package": "npm run build:web && electron-forge package",
+    "start": "npm run build:web && electron-forge start",
+    "start:cli": "node client/lan.js",
+    "typecheck:desktop": "tsc -p desktop/tsconfig.json --noEmit",
+    "test": "node --test",
+    "verify:prepack": "npm test && npm run lint && npm run build && node scripts/verify-prepack.js",
+    "verify:package": "node scripts/verify-packaged-app.js"
   },
   "dependencies": {
-    "@aws-sdk/client-apigatewaymanagementapi": "^3.812.0",
-    "@aws-sdk/client-dynamodb": "^3.812.0",
-    "@aws-sdk/lib-dynamodb": "^3.812.0",
-    "@nut-tree/nut-js": "^3.1.2",
+    "@jitsi/robotjs": "0.6.24",
     "express": "^5.1.0",
-    "http-proxy-middleware": "^3.0.5",
+    "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
-    "ws": "^8.18.1"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "ws": "8.21.3"
   },
   "devDependencies": {
-    "pkg": "^5.8.1",
-    "serverless-finch": "^4.0.4"
-  },
-  "pkg": {
-    "assets": [
-      "controller/public/**/*"
-    ],
-    "targets": [
-      "node18-macos-x64",
-      "node18-win-x64",
-      "node18-linux-x64"
-    ],
-    "outputPath": "dist"
-  },
-  "bin": "client/lan.js"
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-dmg": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron-forge/plugin-auto-unpack-natives": "7.11.2",
+    "@electron-forge/plugin-fuses": "^7.11.2",
+    "@electron-forge/plugin-vite": "^7.11.2",
+    "@electron/fuses": "^1.8.0",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "electron": "^43.3.0",
+    "typescript": "~5.8.3",
+    "vite": "^6.4.3"
+  }
 }

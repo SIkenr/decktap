@@ -1,52 +1,169 @@
+.time-card {
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
 
-.timer-container {
-    margin: 1rem 0;
-    padding: 1rem;
-    background-color: white;
-    border-radius: 0.5rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.network-time-panel,
+.presentation-timer-panel {
+  padding: 1.15rem;
+}
+
+.network-time-panel {
+  background:
+    radial-gradient(circle at 92% 10%, color-mix(in srgb, var(--brand-blue) 14%, transparent), transparent 42%),
+    var(--surface);
+}
+
+.time-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+}
+
+.time-card-heading h2 {
+  margin-top: 0.16rem;
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.section-kicker {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.sync-badge,
+.timer-state {
+  display: inline-flex;
+  min-height: 1.75rem;
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sync-badge > span {
+  width: 0.44rem;
+  height: 0.44rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.sync-badge.synced {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.sync-badge.synced > span {
+  background: var(--success);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 16%, transparent);
+}
+
+.timer-state.running {
+  background: var(--brand-soft);
+  color: var(--brand-blue-dark);
+}
+
+.network-clock,
+.timer-display {
+  display: block;
+  width: 100%;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.025em;
+}
+
+.network-clock {
+  margin-top: 0.72rem;
+  font-size: clamp(2.05rem, 11vw, 3rem);
+  font-weight: 720;
+  line-height: 1.08;
+  text-align: left;
+}
+
+.network-time-panel p {
+  margin-top: 0.32rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.time-divider {
+  height: 1px;
+  margin: 0 1.15rem;
+  background: var(--border-color);
 }
 
 .timer-display {
-    font-size: 2em;
-    font-family: monospace;
-    margin-bottom: 1rem;
-    color: #333;
+  margin: 0.85rem 0 0.95rem;
+  font-size: clamp(2rem, 10vw, 2.8rem);
+  font-weight: 650;
+  line-height: 1;
+  text-align: center;
 }
 
 .timer-controls {
-    display: flex;
-    justify-content: center;
-    gap: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
 }
 
-.timer-btn {
-    padding: 0.8rem 1.2rem;
-    font-size: 1rem;
-    border: none;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    background-color: #4CAF50;
-    color: white;
-    transition: background-color 0.3s;
+.timer-button {
+  min-height: 2.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 720;
 }
 
-.timer-btn:hover {
-    background-color: #45a049;
+.timer-button span {
+  margin-right: 0.22rem;
+  font-size: 0.72rem;
 }
 
-#pauseTimer {
-    background-color: #f39c12;
+.timer-button.primary {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue);
+  color: #fff;
 }
 
-#pauseTimer:hover {
-    background-color: #e67e22;
+.timer-button.subtle {
+  border-color: transparent;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
 }
 
-#resetTimer {
-    background-color: #e74c3c;
+.timer-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
-#resetTimer:hover {
-    background-color: #c0392b;
+@media (min-width: 700px) and (orientation: landscape) {
+  .time-card {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+  }
+
+  .time-divider {
+    width: 1px;
+    height: auto;
+    margin: 1.15rem 0;
+  }
 }
