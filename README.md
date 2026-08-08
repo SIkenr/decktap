@@ -205,6 +205,7 @@ DECKTAP_LOG_DIR=/path/to/logs npm run start:cli
 
 - [CHANGELOG.md](./CHANGELOG.md)：版本更新记录
 - [docs/TEST-BUILDS.md](./docs/TEST-BUILDS.md)：测试包下载、校验与验收清单
+- [docs/LOCAL-DEVELOPMENT.md](./docs/LOCAL-DEVELOPMENT.md)：本地 Codex 开发环境迁移与恢复
 - [LICENSE](./LICENSE)：项目许可证
 
 第三方软件名称、商标和图标归各自权利人所有。DeckTap 仅在本地快捷目标选择器中使用这些图标进行软件识别展示。
