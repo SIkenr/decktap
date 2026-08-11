@@ -1,79 +1,105 @@
-# Changelog
+# 更新记录
 
-All notable DeckTap desktop changes are recorded here. The project is currently distributing unsigned test builds; entries describe development milestones rather than signed public releases.
+DeckTap 目前发布的是未签名测试构建。以下记录描述桌面端、手机控制端和打包产物的主要变化。
 
-## [Unreleased]
+## [1.0.6](https://github.com/SIkenr/decktap/releases/tag/v1.0.6) - 2026-08-11
+
+### 新增
+
+- 手机控制器支持自定义面板排序，可调整网络时间、计时器、演示控制、运行状态和快捷设置的显示顺序。
+- 演示计时器状态会保存到手机浏览器本地，刷新页面后仍能保留已计时时长和运行状态。
+- README 改为中文产品介绍，并加入新的宣传海报和已有截图。
+- Release 产物改为精简统一命名：
+  - `DeckTap-1.0.6-win-x64.zip`
+  - `DeckTap-1.0.6-mac-arm64.zip`
+
+### 优化
+
+- 网络时间和演示计时器拆分为独立面板，手机端信息层级更清晰。
+- 手机端横屏布局改为单列顺序渲染，配合自定义排序减少布局跳动。
+- 版本号更新到 `1.0.6`。
+
+### 修复
+
+- Windows 和 macOS 窗口适配器不再丢弃无标题但可见的窗口。
+- PowerPoint 和 WPS 在 macOS 下的无标题放映窗口可以继续被识别、锁定和自动重锁。
+
+### 验证
+
+- `node --test`：94 项通过
+- `decktap-web` ESLint：通过
+- `decktap-web` Vite build：通过
+- 桌面端 TypeScript `--noEmit`：通过
 
 ## [1.0.5](https://github.com/SIkenr/decktap/releases/tag/v1.0.5) - 2026-08-08
 
-### Added
+### 新增
 
-- Continuous monitoring of the remembered presentation rule, with automatic rebinding when one playback window reappears after editing.
-- Real local application icons for the five built-in quick targets.
+- 持续监控已记住的演示规则，当编辑后重新出现唯一放映窗口时自动重新绑定。
+- 五个内置快捷目标使用本地应用图标。
 
-### Fixed
+### 修复
 
-- PowerPoint and WPS editor windows are no longer selected as page-turn targets when a dedicated slideshow process or playback window is required.
-- Phone controls remain blocked while DeckTap is waiting for a replacement playback window, preventing keys from reaching the editor or another foreground application.
+- PowerPoint 和 WPS 的编辑窗口不再被误选为翻页目标。
+- DeckTap 等待替换放映窗口时，手机端翻页命令会被阻止，避免按键落到编辑器或其他前台应用。
 
-### Test builds
+### 测试包
 
-- Published unsigned Windows x64 portable and macOS ARM64 cross-built archives with SHA-256 checksum files.
-- Built from source commit `f24c6c4a17a40f9ac72d030a39d833031432d256`; see the [test-build guide](./docs/TEST-BUILDS.md) for verification and platform limitations.
+- 发布 Windows x64 便携包和 macOS ARM64 交叉构建包，并提供 SHA-256 校验文件。
+- 构建来源提交：`f24c6c4a17a40f9ac72d030a39d833031432d256`。
 
 ## [1.0.4] - 2026-08-08
 
-### Added
+### 新增
 
-- Six-tile quick target grid for Keynote, PowerPoint, WPS, ProPresenter, PerfectCast (极演投影), and custom applications.
-- Preset process/window recognition rules for the five built-in presentation applications.
-- One-click locking when a preset has exactly one match, with explicit selection for ambiguous matches.
-- Startup restoration of the last built-in or custom target rule when exactly one matching window is running.
-- Custom tile navigation to the full target discovery and custom-rule workflow.
+- 六宫格快捷目标：Keynote、PowerPoint、WPS、ProPresenter、PerfectCast / 极演投影和自定义应用。
+- 为五个内置演示应用加入进程和窗口识别规则。
+- 只有一个匹配目标时可一键锁定；多个目标时要求明确选择。
+- 启动时可恢复上次使用的内置或自定义目标规则。
+- 自定义入口支持完整目标发现和规则保存流程。
 
-### Changed
+### 优化
 
-- Prepared Windows x64 portable and macOS ARM64 cross-built unsigned test archives.
-- Updated package verification metadata and test-build documentation for 1.0.4.
+- 准备 Windows x64 和 macOS ARM64 未签名测试包。
+- 更新 1.0.4 的打包验证元数据和测试包文档。
 
 ## [1.0.3] - 2026-08-08
 
-### Added
+### 新增
 
-- Six-digit numeric confirmation after QR discovery.
-- Single-device private-LAN trust for browser reopen or browser switching.
-- Automatic revocation and disconnection of all previously authorized devices when a new device pairs.
-- Anonymous active-device and revoked-history views without complete IP addresses or user-agent strings.
+- 扫码后增加 6 位数字确认。
+- 为浏览器重新打开或切换浏览器场景加入单设备私人局域网信任。
+- 新设备配对后自动撤销并断开旧设备。
+- 设备视图只展示匿名活跃设备和撤销历史，不保存完整 IP 或 User-Agent。
 
-### Changed
+### 优化
 
-- Desktop and mobile connection states now advance only after successful secure pairing.
-- Manual pairing rotation disconnects the active controller and invalidates its trust.
+- 桌面端和手机端连接状态只在安全配对成功后进入已连接。
+- 手动刷新配对码会撤销当前授权并要求重新配对。
 
 ## [1.0.2] - 2026-08-08
 
-### Added
+### 新增
 
-- Redesigned mobile controller aligned with the desktop visual language.
-- Desktop-synchronized network time above the presentation timer.
-- Responsive timer and page-turn controls, including vertical and horizontal page-turn modes.
+- 重设计手机控制器，使其更接近桌面端视觉语言。
+- 在演示计时器上方加入电脑同步时间。
+- 手机端支持上下翻页和左右翻页两种按键模式。
 
-### Fixed
+### 修复
 
-- Packaged WebSocket framing compatibility on Windows.
-- Windows target-window activation and packaged native-module handling.
+- 修复 Windows 打包后的 WebSocket 兼容问题。
+- 修复 Windows 目标窗口激活和原生模块打包处理。
 
 ## [1.0.1] - 2026-08-08
 
-### Added
+### 新增
 
-- Electron desktop management client with secure preload/IPC boundaries.
-- Target-window discovery, selection, focus restoration, and safe command acknowledgements.
-- macOS Accessibility recovery actions and Windows/macOS platform adapters.
-- Structured rotating logs and sanitized in-app diagnostics.
-- Anonymous controller session management, tray lifecycle controls, themes, and pre-package validation.
-- Unsigned cross-platform test packaging workflow.
+- Electron 桌面管理客户端。
+- 目标窗口发现、选择、焦点恢复和安全命令回执。
+- macOS 辅助功能权限恢复动作，以及 Windows/macOS 平台窗口适配器。
+- 结构化轮转日志和应用内脱敏诊断。
+- 匿名控制器会话管理、托盘生命周期、主题和打包前验证。
 
 ## [1.0.0]
 
-- Original local-network Node.js/WebSocket presentation controller and phone web interface.
+- 初始版本：基于 Node.js、WebSocket 和手机网页的局域网演示控制器。
