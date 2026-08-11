@@ -112,6 +112,35 @@ test('PowerPoint and WPS editor windows are excluded from playback targeting', a
   assert.equal(locked.at(-1).id, wpsPlayback.id);
 });
 
+test('macOS titleless playback windows remain lockable for presentation apps', async () => {
+  const macPowerPointPlayback = {
+    ...powerPointWindow,
+    id: 'mac-powerpoint-playback',
+    appName: 'Microsoft PowerPoint',
+    bundleId: 'com.microsoft.PowerPoint',
+    windowClass: 'AXWindow',
+    title: '',
+    platform: 'darwin',
+  };
+  const macWpsPlayback = {
+    ...powerPointWindow,
+    id: 'mac-wps-playback',
+    appName: 'WPS Office',
+    bundleId: 'com.kingsoft.wpsoffice.mac',
+    windowClass: 'AXWindow',
+    title: '',
+    platform: 'darwin',
+  };
+  const { locked, service } = createService([macPowerPointPlayback, macWpsPlayback]);
+
+  assert.equal(findBuiltInRule(macPowerPointPlayback)?.id, 'powerpoint');
+  assert.equal(findBuiltInRule(macWpsPlayback)?.id, 'wps-presentation');
+  assert.equal((await service.lockRule('powerpoint')).outcome, 'locked');
+  assert.equal(locked.at(-1).id, macPowerPointPlayback.id);
+  assert.equal((await service.lockRule('wps-presentation')).outcome, 'locked');
+  assert.equal(locked.at(-1).id, macWpsPlayback.id);
+});
+
 test('remembered rule rebinds only after one playback window appears', async () => {
   const windows = [powerPointEditorWindow];
   const { locked, service } = createService(windows);

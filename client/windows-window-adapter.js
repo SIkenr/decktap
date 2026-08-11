@@ -79,7 +79,7 @@ switch ($Operation) {
       param([IntPtr]$candidate, [IntPtr]$state)
       if ([DeckTapWindowApi]::IsWindowVisible($candidate)) {
         $item = Get-WindowData $candidate
-        if ($item -and $item.processId -ne $ExcludedProcessId -and $item.title) { $items.Add($item) }
+        if ($item -and $item.processId -ne $ExcludedProcessId) { $items.Add($item) }
       }
       return $true
     }
