@@ -1,7 +1,7 @@
 # DeckTap
 
 <p align="center">
-  <img src="./images/decktap-poster.png" alt="DeckTap 手机浏览器控制电脑演示" width="920" />
+  <img src="./images/decktap-poster.svg" alt="DeckTap 手机浏览器控制电脑演示" width="920" />
 </p>
 
 **DeckTap 是一个局域网演示遥控器。** 在电脑上运行桌面客户端，用手机连接同一个 Wi-Fi 或热点，扫码并输入数字配对码后，就能直接在手机浏览器里控制 PowerPoint、Keynote、WPS、ProPresenter、极演投影、PDF 放映或其他演示窗口。
