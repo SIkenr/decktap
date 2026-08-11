@@ -1,56 +1,62 @@
-# DeckTap 1.0.5 test builds
+# DeckTap 1.0.6 测试包说明
 
-These packages are unsigned test builds. Use them only on computers you control.
+这些包是未签名测试构建，只建议在自己控制的电脑和可信私人网络中使用。
 
-- Release: [DeckTap v1.0.5](https://github.com/SIkenr/decktap/releases/tag/v1.0.5)
-- Source commit: `f24c6c4a17a40f9ac72d030a39d833031432d256`
+- Release：[DeckTap v1.0.6](https://github.com/SIkenr/decktap/releases/tag/v1.0.6)
+- 源码提交：`2900db08798b`
+- 命名规则：`DeckTap-<版本>-<平台>-<架构>.zip`
 
-## Package files
+## 包文件
 
-| Package | SHA-256 |
-| --- | --- |
-| [`DeckTap-1.0.5-test-win32-x64-portable-unsigned.zip`](https://github.com/SIkenr/decktap/releases/download/v1.0.5/DeckTap-1.0.5-test-win32-x64-portable-unsigned.zip) | `dc28a8d5616879ebc7142986b7cc730e6864ebe0bff789adefe7448837a8a734` |
-| [`DeckTap-1.0.5-test-macos-arm64-crossbuilt-unsigned.zip`](https://github.com/SIkenr/decktap/releases/download/v1.0.5/DeckTap-1.0.5-test-macos-arm64-crossbuilt-unsigned.zip) | `de608df1401bdc50d0ea8af86e13d836b9218a50422bf054a06592d1c0b98ae1` |
+| 平台 | 文件 | SHA-256 |
+| --- | --- | --- |
+| Windows x64 | [`DeckTap-1.0.6-win-x64.zip`](https://github.com/SIkenr/decktap/releases/download/v1.0.6/DeckTap-1.0.6-win-x64.zip) | `1b7a1110ce22fdd7909a579d57ce667c030e27d58840795433b8a5a215dffffd` |
+| macOS Apple Silicon | [`DeckTap-1.0.6-mac-arm64.zip`](https://github.com/SIkenr/decktap/releases/download/v1.0.6/DeckTap-1.0.6-mac-arm64.zip) | `5a00e1fcb7100e431c9c901f7b8c408d8fc99700d5db703c0ad5ec229e456a83` |
 
-A matching `.sha256` file accompanies each archive. Verify it before extraction with `sha256sum -c <filename>.sha256` (or the platform equivalent).
+Release 中同时提供 `.sha256` 文件。解压前请先验证：
 
-## Windows x64 portable build
+```bash
+shasum -a 256 -c DeckTap-1.0.6-win-x64.zip.sha256
+shasum -a 256 -c DeckTap-1.0.6-mac-arm64.zip.sha256
+```
 
-1. Extract the entire ZIP archive before running it.
-2. Start `DeckTap/decktap.exe`; do not move the executable away from its adjacent files.
-3. If Microsoft Defender SmartScreen appears, confirm that the file came from this project before choosing **More info** and **Run anyway**.
-4. Allow DeckTap through Windows Firewall only on **Private networks**.
-5. Test startup, QR plus six-digit pairing, trusted-IP browser recovery, new-device replacement, page turns, the five preset quick targets, custom target rules, startup target restoration, target-window recovery, tray behavior, and clean exit.
-6. For PowerPoint and WPS, start a slideshow, edit the document so the playback window closes, then start the slideshow again. Confirm DeckTap enters a safe waiting state and automatically re-locks the new playback window without focusing the editor.
+## Windows x64
 
-## macOS ARM64 cross-built app
+1. 完整解压 ZIP，不要只把 `decktap.exe` 单独移出目录。
+2. 运行 `DeckTap/decktap.exe`。
+3. 如果 Microsoft Defender SmartScreen 提示风险，请先确认文件来源和 SHA-256，再选择继续运行。
+4. Windows 防火墙询问时，只允许 **专用网络**。
+5. 测试启动、扫码、6 位数字配对、浏览器恢复、新设备替换、翻页、快捷目标、自定义目标、目标恢复、托盘和退出。
+6. PowerPoint/WPS 场景下，关闭并重开放映窗口，确认 DeckTap 会进入安全等待状态并自动重新锁定。
 
-This `.app` was assembled on Linux and is not signed or notarized. It targets Apple Silicon Macs.
+## macOS ARM64
 
-1. Extract the ZIP archive.
-2. In Terminal, ad-hoc sign the extracted application:
+该 `.app` 未使用 Apple Developer ID 签名，也未经过公证。
+
+1. 解压 ZIP。
+2. 在终端对应用做临时签名：
 
    ```bash
    codesign --force --deep --sign - /path/to/DeckTap.app
    ```
 
-3. Right-click `DeckTap.app` and choose **Open**. If macOS still blocks it, use **System Settings > Privacy & Security > Open Anyway** only after verifying the archive checksum.
-4. Grant DeckTap Accessibility permission when prompted, then restart the app.
-5. Test QR plus six-digit pairing, trusted-IP browser recovery, new-device replacement, Keynote/PowerPoint/PDF page turns, the preset quick targets, custom target rules, startup target restoration, permission denial and recovery, target-window focus recovery, tray behavior, and clean exit.
-6. Close and restart a slideshow while keeping its editor open. Confirm DeckTap blocks page-turn commands while waiting and automatically re-locks the replacement playback window.
+3. 右键 `DeckTap.app` 选择 **打开**。如果 macOS 仍拦截，请在验证校验值后使用 **系统设置 -> 隐私与安全性 -> 仍要打开**。
+4. 授予 DeckTap 辅助功能权限，然后重启应用。
+5. 测试扫码、6 位数字配对、浏览器恢复、新设备替换、Keynote/PowerPoint/PDF 翻页、快捷目标、自定义目标、权限恢复、托盘和退出。
+6. 保持编辑器打开并重开放映窗口，确认等待期间手机命令被阻止，新的放映窗口出现后自动重新锁定。
 
-## Pairing acceptance checks
+## 配对验收清单
 
-- Scanning the QR code opens the numeric pairing screen, not the controller.
-- The phone reaches the controller only after the six-digit code succeeds; the desktop immediately shows the connected state.
-- Reopening or switching browsers on the same trusted private-LAN address can recover without another code while trust remains valid.
-- Pairing a different device immediately disconnects and revokes the previous device; the old entry remains only as anonymous history.
-- Rotating the pairing code revokes the current authorization and requires a fresh numeric pairing.
+- 扫码后先进入数字配对页，而不是直接进入控制器。
+- 输入正确 6 位数字码后，手机进入控制页，桌面端显示已连接。
+- 同一可信私人局域网地址在信任有效期内可恢复连接。
+- 另一台手机完成配对后，旧设备立即断开并失去权限。
+- 刷新配对码会撤销当前授权，需要重新配对。
 
-## Limitations
+## 已知限制
 
-- No Windows Authenticode signature.
-- No Apple Developer ID signature or notarization.
-- No installer or automatic update flow.
-- Cross-built packages still require launch and real-keyboard verification on matching hardware.
-- The desktop quick-target grid uses local product icons; the packaged application itself still uses Electron's default executable icon.
+- Windows 包没有 Authenticode 签名。
+- macOS 包没有 Apple Developer ID 签名或公证。
+- 当前没有安装器和自动更新。
+- 跨平台包仍需在真实硬件上验证启动、权限、键盘控制、防火墙、托盘和退出。
+- 桌面快捷目标已使用本地软件图标，但应用自身图标仍需后续完善。
