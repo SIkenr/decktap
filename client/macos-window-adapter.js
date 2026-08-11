@@ -67,7 +67,7 @@ function run(argv) {
       if (!processId || processId === Number(payload.excludeProcessId || 0)) return;
       windowsFor(process).forEach(function (window, index) {
         const item = describe(process, window, index);
-        if (item && item.title) result.push(item);
+        if (item) result.push(item);
       });
     });
   } else {

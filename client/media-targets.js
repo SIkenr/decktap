@@ -19,6 +19,7 @@ const BUILTIN_MEDIA_APPS = Object.freeze([
       appNames: ['pptview'],
       windowClasses: ['screenclass'],
       titleFragments: ['powerpoint slide show', 'slide show', '幻灯片放映', '投影片放映'],
+      allowTitlelessMacOSWindow: true,
     },
   },
   {
@@ -44,6 +45,7 @@ const BUILTIN_MEDIA_APPS = Object.freeze([
       appNames: ['wppshow', 'wpsshow', 'wppplay'],
       windowClassFragments: ['wppscreen', 'wppshow', 'wpsscreen', 'wpsshow'],
       titleFragments: ['slide show', '幻灯片放映', '投影片放映', '放映 - wps'],
+      allowTitlelessMacOSWindow: true,
     },
   },
   {
@@ -120,7 +122,8 @@ function matchesPlaybackWindow(window, rule) {
     includesNormalized(rule.playback.appNames, appName)
     || includesNormalized(rule.playback.windowClasses, windowClass)
     || containsNormalized(rule.playback.windowClassFragments, windowClass)
-    || (window.platform === 'darwin' && containsNormalized(rule.playback.titleFragments, title)),
+    || (window.platform === 'darwin' && containsNormalized(rule.playback.titleFragments, title))
+    || (window.platform === 'darwin' && !title && rule.playback.allowTitlelessMacOSWindow === true)
   );
 }
 

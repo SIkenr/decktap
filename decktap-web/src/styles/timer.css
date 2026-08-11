@@ -1,17 +1,13 @@
 .time-card {
   overflow: hidden;
+  padding: 1.15rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: var(--shadow-card);
 }
 
-.network-time-panel,
-.presentation-timer-panel {
-  padding: 1.15rem;
-}
-
-.network-time-panel {
+.network-time-card {
   background:
     radial-gradient(circle at 92% 10%, color-mix(in srgb, var(--brand-blue) 14%, transparent), transparent 42%),
     var(--surface);
@@ -95,17 +91,11 @@
   text-align: left;
 }
 
-.network-time-panel p {
+.network-time-card p {
   margin-top: 0.32rem;
   color: var(--text-secondary);
   font-size: 0.78rem;
   text-align: left;
-}
-
-.time-divider {
-  height: 1px;
-  margin: 0 1.15rem;
-  background: var(--border-color);
 }
 
 .timer-display {
@@ -153,17 +143,4 @@
 .timer-button:disabled {
   cursor: not-allowed;
   opacity: 0.42;
-}
-
-@media (min-width: 700px) and (orientation: landscape) {
-  .time-card {
-    display: grid;
-    grid-template-columns: 1fr 1px 1fr;
-  }
-
-  .time-divider {
-    width: 1px;
-    height: auto;
-    margin: 1.15rem 0;
-  }
 }

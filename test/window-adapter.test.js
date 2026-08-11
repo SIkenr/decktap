@@ -93,6 +93,21 @@ test('macOS adapter keeps bundle identity and rejects malformed window results',
   assert.equal(await adapter.isWindowActive(capturedWindow), true);
 });
 
+test('window adapters keep visible windows even when titles are empty', async () => {
+  const titlelessWindow = { ...capturedWindow, title: '' };
+  const windows = createWindowsWindowAdapter({
+    run: async (operation) => (operation === 'list' ? [titlelessWindow] : titlelessWindow),
+  });
+  const macos = createMacOSWindowAdapter({
+    run: async (operation) => (operation === 'list'
+      ? [{ ...titlelessWindow, bundleId: 'com.microsoft.PowerPoint' }]
+      : titlelessWindow),
+  });
+
+  assert.equal((await windows.listWindows())[0].title, '');
+  assert.equal((await macos.listWindows())[0].title, '');
+});
+
 test('platform factory selects supported adapters and safely disables unsupported platforms', async () => {
   const windows = createPlatformWindowAdapter({ platform: 'win32', run: async () => capturedWindow });
   assert.equal((await windows.captureActiveWindow()).platform, 'win32');
