@@ -27,18 +27,14 @@
 ## 界面预览
 
 <p align="center">
-  <a href="./images/hero.png">
-    <img src="./images/hero.png" alt="DeckTap 实际使用场景" width="680" />
+  <a href="./images/decktap-desktop.png">
+    <img src="./images/decktap-desktop.png" alt="DeckTap 桌面端真实截图" width="920" />
   </a>
 </p>
 
 <p align="center">
-  <a href="./images/phone-controller.png">
-    <img src="./images/phone-controller.png" alt="DeckTap 手机控制器截图" width="260" />
-  </a>
-  &nbsp;&nbsp;
-  <a href="./images/computer-client.png">
-    <img src="./images/computer-client.png" alt="DeckTap 命令行局域网模式截图" width="520" />
+  <a href="./images/decktap-mobile.jpeg">
+    <img src="./images/decktap-mobile.jpeg" alt="DeckTap 手机控制器真实截图" width="300" />
   </a>
 </p>
 
