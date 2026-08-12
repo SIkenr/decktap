@@ -10,7 +10,7 @@
 
 [下载最新版](https://github.com/SIkenr/decktap/releases) · [更新记录](./CHANGELOG.md) · [测试包说明](./docs/TEST-BUILDS.md)
 
-> 当前版本：**1.0.6**。现阶段提供的是未签名测试包，请只在自己控制的电脑和可信私人网络中使用。
+> 当前版本：**1.0.15**。现阶段提供的是未签名测试包，请只在自己控制的电脑和可信私人网络中使用。
 
 ## 亮点
 
@@ -19,6 +19,7 @@
 - **数字码二次确认**：扫码后还要输入电脑端 6 位数字码，避免同网段误连。
 - **演示窗口锁定**：翻页前恢复并验证目标窗口焦点，目标丢失时不会把按键发给其他应用。
 - **PowerPoint / WPS 放映保护**：识别放映窗口，避开编辑窗口；放映窗口重开后可自动重新锁定。
+- **自动识别演示软件**：正常窗口枚举失效时，会通过白名单进程兜底发现 PowerPoint、Keynote、WPS、ProPresenter、PDF 和媒体播放器。
 - **手机端计时工具**：显示演示计时、电脑同步时间，并支持本地保存计时状态。
 - **自定义控制布局**：手机端可调整网络时间、计时器、控制区、状态和设置面板的顺序。
 - **桌面端管理**：支持二维码、配对状态、目标选择、设备管理、主题、托盘、开机启动和脱敏日志。
@@ -45,21 +46,21 @@
 
 | 平台 | 文件 | SHA-256 |
 | --- | --- | --- |
-| Windows x64 | [`DeckTap-1.0.6-win-x64.zip`](https://github.com/SIkenr/decktap/releases/download/v1.0.6/DeckTap-1.0.6-win-x64.zip) | `1b7a1110ce22fdd7909a579d57ce667c030e27d58840795433b8a5a215dffffd` |
-| macOS Apple Silicon | [`DeckTap-1.0.6-mac-arm64.zip`](https://github.com/SIkenr/decktap/releases/download/v1.0.6/DeckTap-1.0.6-mac-arm64.zip) | `5a00e1fcb7100e431c9c901f7b8c408d8fc99700d5db703c0ad5ec229e456a83` |
+| Windows x64 | [`DeckTap-1.0.15-win-x64.zip`](https://github.com/SIkenr/decktap/releases/download/v1.0.15/DeckTap-1.0.15-win-x64.zip) | `5eb3b10f1bbade2f72f712f7acb428df15db4ee7e4cd6d70b64a356e998d3ffa` |
+| macOS Apple Silicon | [`DeckTap-1.0.15-mac-arm64.zip`](https://github.com/SIkenr/decktap/releases/download/v1.0.15/DeckTap-1.0.15-mac-arm64.zip) | `091af9a98616d309150f6aca76066933c10cf5b51aaf480f39dde675b5b780fe` |
 
 Release 中同时提供 `.sha256` 校验文件。解压前建议验证：
 
 ```bash
-shasum -a 256 -c DeckTap-1.0.6-win-x64.zip.sha256
-shasum -a 256 -c DeckTap-1.0.6-mac-arm64.zip.sha256
+shasum -a 256 -c DeckTap-1.0.15-win-x64.zip.sha256
+shasum -a 256 -c DeckTap-1.0.15-mac-arm64.zip.sha256
 ```
 
 ## 快速开始
 
 ### Windows
 
-1. 下载 `DeckTap-1.0.6-win-x64.zip` 并完整解压。
+1. 下载 `DeckTap-1.0.15-win-x64.zip` 并完整解压。
 2. 运行解压目录里的 `DeckTap/decktap.exe`。
 3. 如果 SmartScreen 提示风险，请先核对来源和 SHA-256，再选择继续运行。
 4. Windows 防火墙询问时，只允许 **专用网络**。
@@ -149,9 +150,9 @@ PORT=10000 npm run start:cli
 | `npm run make` | 生成 Electron Forge 分发包 |
 | `npm run verify:package -- <app-path>` | 验证打包后的应用结构和安全配置 |
 
-1.0.6 验证结果：
+1.0.15 验证结果：
 
-- `node --test`：94 项通过
+- `node --test`：107 项通过
 - `decktap-web` ESLint：通过
 - `decktap-web` Vite build：通过
 - 桌面端 TypeScript `--noEmit`：通过
@@ -186,6 +187,7 @@ decktap/
 
 - [CHANGELOG.md](./CHANGELOG.md)：中文更新记录
 - [docs/TEST-BUILDS.md](./docs/TEST-BUILDS.md)：测试包下载、校验和验收清单
+- [docs/SUPPORTED-PROCESSES.md](./docs/SUPPORTED-PROCESSES.md)：进程白名单和兜底识别说明
 - [docs/LOCAL-DEVELOPMENT.md](./docs/LOCAL-DEVELOPMENT.md)：本地开发环境迁移与恢复
 - [LICENSE](./LICENSE)：项目许可证
 

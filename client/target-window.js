@@ -9,6 +9,8 @@ class TargetWindowError extends Error {
 function createTargetWindowController(options = {}) {
   const adapter = options.adapter;
   const focusDelayMs = options.focusDelayMs ?? 100;
+  const focusRetryDelayMs = options.focusRetryDelayMs ?? focusDelayMs;
+  const focusVerificationAttempts = Math.max(1, Math.floor(options.focusVerificationAttempts ?? 2));
   const wait = options.wait || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const onStatusChanged = options.onStatusChanged || (() => {});
 
@@ -99,49 +101,65 @@ function createTargetWindowController(options = {}) {
       }
     }
 
-    let activated;
-    try {
-      activated = await adapter.activateWindow(target);
-    } catch (error) {
-      fail(
-        'TARGET_FOCUS_FAILED',
-        'The selected presentation or media window could not be focused.',
-        { cause: error },
-      );
-    }
-
-    if (activated === false) {
-      fail(
-        'TARGET_FOCUS_FAILED',
-        'The selected presentation or media window could not be focused.',
-      );
-    }
-
-    if (focusDelayMs > 0) {
-      await wait(focusDelayMs);
-    }
-
-    if (typeof adapter.isWindowActive === 'function') {
-      let active;
+    const requiresActivation = String(target.id || '').endsWith(':ps');
+    let wasActive = false;
+    if (!requiresActivation && typeof adapter.isWindowActive === 'function') {
       try {
-        active = await adapter.isWindowActive(target);
+        wasActive = await adapter.isWindowActive(target);
+      } catch {
+        wasActive = false;
+      }
+    }
+
+    let active = wasActive;
+    for (let attempt = 0; attempt < focusVerificationAttempts && !active; attempt += 1) {
+      let activated;
+      try {
+        activated = await adapter.activateWindow(target);
       } catch (error) {
         fail(
           'TARGET_FOCUS_FAILED',
-          'The selected presentation or media window focus could not be verified.',
+          'The selected presentation or media window could not be focused.',
           { cause: error },
         );
       }
-      if (!active) {
+
+      if (activated === false) {
         fail(
           'TARGET_FOCUS_FAILED',
-          'The selected presentation or media window did not become active.',
+          'The selected presentation or media window could not be focused.',
         );
+      }
+
+      const delayMs = attempt === 0 ? focusDelayMs : focusRetryDelayMs;
+      if (delayMs > 0) {
+        await wait(delayMs);
+      }
+
+      if (typeof adapter.isWindowActive !== 'function') {
+        active = true;
+      } else {
+        try {
+          active = await adapter.isWindowActive(target);
+        } catch (error) {
+          fail(
+            'TARGET_FOCUS_FAILED',
+            'The selected presentation or media window focus could not be verified.',
+            { cause: error },
+          );
+        }
       }
     }
 
+    if (!active) {
+      fail(
+        'TARGET_FOCUS_FAILED',
+        'The selected presentation or media window did not become active.',
+      );
+    }
+
     setStatus('locked');
-    return { status: 'focused', target };
+    return { status: 'focused', target, focusChanged: !wasActive };
   }
 
   return {

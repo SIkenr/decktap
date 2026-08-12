@@ -1,4 +1,8 @@
 const crypto = require('node:crypto');
+const {
+  processRuleForBundleId,
+  processRuleForName,
+} = require('./process-whitelist');
 
 const MAX_CANDIDATES = 64;
 const QUICK_TARGET_RULE_IDS = Object.freeze([
@@ -13,7 +17,7 @@ const BUILTIN_MEDIA_APPS = Object.freeze([
   {
     id: 'powerpoint',
     displayName: 'Microsoft PowerPoint',
-    appNames: ['powerpnt', 'microsoft powerpoint', 'pptview'],
+    appNames: ['powerpoint', 'powerpnt', 'microsoft powerpoint', 'pptview'],
     bundleIds: ['com.microsoft.powerpoint'],
     playback: {
       appNames: ['pptview'],
@@ -26,7 +30,7 @@ const BUILTIN_MEDIA_APPS = Object.freeze([
     id: 'keynote',
     displayName: 'Apple Keynote',
     appNames: ['keynote'],
-    bundleIds: ['com.apple.keynote'],
+    bundleIds: ['com.apple.keynote', 'com.apple.iwork.keynote'],
   },
   {
     id: 'wps-presentation',
@@ -99,9 +103,12 @@ function normalizeIdentity(value) {
 function matchesIdentity(window, rule) {
   const appName = normalizeIdentity(window.appName);
   const bundleId = normalizeIdentity(window.bundleId);
+  const processRule = processRuleForBundleId(bundleId, window.platform)
+    || processRuleForName(appName, window.platform);
   return Boolean(
     (bundleId && rule.bundleIds?.includes(bundleId))
-    || (appName && rule.appNames?.includes(appName)),
+    || (appName && rule.appNames?.includes(appName))
+    || processRule?.ruleId === rule.id,
   );
 }
 

@@ -31,6 +31,8 @@ function createRobotJsKeyboardAdapter(robotJs) {
 function createKeyboardController(dependencies = {}) {
   let keyboard = dependencies.keyboard;
   const targetWindowController = dependencies.targetWindowController;
+  const focusSettleDelayMs = dependencies.focusSettleDelayMs ?? 0;
+  const wait = dependencies.wait || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const requireRobotJs = dependencies.requireRobotJs || (() => require('@jitsi/robotjs'));
 
   function loadKeyboard() {
@@ -56,7 +58,10 @@ function createKeyboardController(dependencies = {}) {
       }
 
       if (targetWindowController) {
-        await targetWindowController.ensureFocused();
+        const focusResult = await targetWindowController.ensureFocused();
+        if (focusResult?.focusChanged && focusSettleDelayMs > 0) {
+          await wait(focusSettleDelayMs);
+        }
       }
 
       loadKeyboard();

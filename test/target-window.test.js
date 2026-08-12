@@ -33,6 +33,7 @@ test('target window controller captures, activates, waits, and clears a target',
 
   const result = await controller.ensureFocused();
   assert.equal(result.status, 'focused');
+  assert.equal(result.focusChanged, true);
   assert.deepEqual(calls, [
     ['capture'],
     ['available', 'window-42'],
@@ -198,4 +199,67 @@ test('target window controller verifies focus before allowing a key command', as
   await controller.ensureFocused();
   assert.equal(controller.getStatus(), 'locked');
   assert.deepEqual(statuses, ['locked', 'lost', 'locked']);
+});
+
+test('target window controller retries macOS-style focus verification before failing', async () => {
+  const calls = [];
+  let activeChecks = 0;
+  const controller = createTargetWindowController({
+    focusDelayMs: 30,
+    focusRetryDelayMs: 10,
+    focusVerificationAttempts: 3,
+    wait: async (milliseconds) => calls.push(['wait', milliseconds]),
+    adapter: {
+      async captureActiveWindow() {
+        return { id: 'window-12', processId: 12 };
+      },
+      async activateWindow() {
+        calls.push(['activate']);
+        return true;
+      },
+      async isWindowActive() {
+        activeChecks += 1;
+        calls.push(['active', activeChecks]);
+        return activeChecks >= 3;
+      },
+    },
+  });
+
+  await controller.captureCurrent();
+  const result = await controller.ensureFocused();
+  assert.equal(result.focusChanged, true);
+  assert.deepEqual(calls, [
+    ['active', 1],
+    ['activate'],
+    ['wait', 30],
+    ['active', 2],
+    ['activate'],
+    ['wait', 10],
+    ['active', 3],
+  ]);
+});
+
+test('target window controller always activates ps fallback targets before key commands', async () => {
+  const calls = [];
+  const controller = createTargetWindowController({
+    focusDelayMs: 0,
+    adapter: {
+      async captureActiveWindow() {
+        return { id: '100:ps', processId: 100, windowClass: 'BSDProcess' };
+      },
+      async activateWindow() {
+        calls.push('activate');
+        return true;
+      },
+      async isWindowActive() {
+        calls.push('active');
+        return true;
+      },
+    },
+  });
+
+  await controller.captureCurrent();
+  const result = await controller.ensureFocused();
+  assert.equal(result.focusChanged, true);
+  assert.deepEqual(calls, ['activate', 'active']);
 });

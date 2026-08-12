@@ -1,4 +1,5 @@
 const { runSystemCommand } = require('./system-command');
+const { isWhitelistedProcess } = require('./process-whitelist');
 
 const WINDOWS_WINDOW_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
@@ -84,13 +85,45 @@ switch ($Operation) {
       return $true
     }
     [void][DeckTapWindowApi]::EnumWindows($callback, [IntPtr]::Zero)
+    if ($items.Count -eq 0) {
+      Get-Process | ForEach-Object {
+        if ($_.Id -ne $ExcludedProcessId) {
+          $items.Add([ordered]@{
+            id = ([string]$_.Id) + ':process'
+            processId = [int]$_.Id
+            appName = $_.ProcessName
+            windowClass = 'Process'
+            title = ''
+            platform = 'win32'
+          })
+        }
+      }
+    }
     $result = @($items)
   }
   'available' {
+    if ($WindowId.EndsWith(':process')) {
+      $result = [bool](Get-Process -Id $ExpectedProcessId -ErrorAction SilentlyContinue)
+      break
+    }
     $item = Get-WindowData $handle
     $result = [bool]($item -and ($ExpectedProcessId -le 0 -or $item.processId -eq $ExpectedProcessId))
   }
   'activate' {
+    if ($WindowId.EndsWith(':process')) {
+      $process = Get-Process -Id $ExpectedProcessId -ErrorAction SilentlyContinue
+      $mainWindow = if ($process) { $process.MainWindowHandle } else { [IntPtr]::Zero }
+      if ($mainWindow -eq [IntPtr]::Zero) {
+        $result = $false
+        break
+      }
+      if ([DeckTapWindowApi]::IsIconic($mainWindow)) { [void][DeckTapWindowApi]::ShowWindowAsync($mainWindow, 9) }
+      [void][DeckTapWindowApi]::BringWindowToTop($mainWindow)
+      [void][DeckTapWindowApi]::SetForegroundWindow($mainWindow)
+      Start-Sleep -Milliseconds 80
+      $result = [DeckTapWindowApi]::GetForegroundWindow() -eq $mainWindow
+      break
+    }
     $item = Get-WindowData $handle
     if (-not $item -or ($ExpectedProcessId -gt 0 -and $item.processId -ne $ExpectedProcessId)) {
       $result = $false
@@ -103,6 +136,12 @@ switch ($Operation) {
     $result = [DeckTapWindowApi]::GetForegroundWindow() -eq $handle
   }
   'active' {
+    if ($WindowId.EndsWith(':process')) {
+      $process = Get-Process -Id $ExpectedProcessId -ErrorAction SilentlyContinue
+      $mainWindow = if ($process) { $process.MainWindowHandle } else { [IntPtr]::Zero }
+      $result = $mainWindow -ne [IntPtr]::Zero -and [DeckTapWindowApi]::GetForegroundWindow() -eq $mainWindow
+      break
+    }
     $result = [DeckTapWindowApi]::GetForegroundWindow() -eq $handle
   }
   default { throw 'Unsupported window operation.' }
@@ -149,6 +188,13 @@ function sanitizeWindow(value) {
   });
 }
 
+function filterFallbackProcesses(windows) {
+  return windows.filter((window) => (
+    !String(window.id || '').endsWith(':process')
+    || isWhitelistedProcess(window.appName, 'win32')
+  ));
+}
+
 function createWindowsWindowAdapter(options = {}) {
   const run = options.run || ((operation, target = {}) => {
     const command = createWindowsCommand(operation, target, options);
@@ -161,7 +207,7 @@ function createWindowsWindowAdapter(options = {}) {
     },
     async listWindows() {
       const result = await run('list');
-      return (Array.isArray(result) ? result : [result]).map(sanitizeWindow).filter(Boolean);
+      return filterFallbackProcesses((Array.isArray(result) ? result : [result]).map(sanitizeWindow).filter(Boolean));
     },
     async isWindowAvailable(target) {
       return (await run('available', target)) === true;
@@ -180,5 +226,6 @@ module.exports = {
   WINDOWS_WINDOW_SCRIPT_BASE64,
   createWindowsCommand,
   createWindowsWindowAdapter,
+  filterFallbackProcesses,
   sanitizeWindow,
 };
