@@ -141,6 +141,27 @@ test('macOS titleless playback windows remain lockable for presentation apps', a
   assert.equal(locked.at(-1).id, macWpsPlayback.id);
 });
 
+test('macOS visible presentation processes remain lockable without AX windows', async () => {
+  const macPowerPointProcess = {
+    ...powerPointWindow,
+    id: '42:process',
+    processId: 42,
+    appName: 'PowerPoint',
+    bundleId: 'com.microsoft.PowerPoint',
+    windowClass: 'AXApplication',
+    title: '',
+    platform: 'darwin',
+  };
+  const { locked, service } = createService([macPowerPointProcess]);
+  const scan = await service.scan();
+
+  assert.equal(findBuiltInRule(macPowerPointProcess)?.id, 'powerpoint');
+  assert.equal(scan.status, 'single-candidate');
+  assert.equal(scan.candidates[0].ruleId, 'powerpoint');
+  assert.equal((await service.lockRule('powerpoint')).outcome, 'locked');
+  assert.equal(locked.at(-1).id, '42:process');
+});
+
 test('remembered rule rebinds only after one playback window appears', async () => {
   const windows = [powerPointEditorWindow];
   const { locked, service } = createService(windows);

@@ -58,9 +58,12 @@ let targetMonitor = null;
 let trustedClientStore = null;
 let trayController = null;
 let unsubscribeService = null;
+let mediaSuggestionTimer = null;
+let mediaSuggestionScanning = false;
 let isQuitting = false;
 
 const MACOS_ACCESSIBILITY_SETTINGS_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
+const MEDIA_SUGGESTION_INTERVAL_MS = 5000;
 
 function isTrustedSender(event) {
   return Boolean(
@@ -198,6 +201,46 @@ function broadcastSnapshot() {
   trayController?.refresh(snapshot);
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send(IPC_CHANNELS.SNAPSHOT_CHANGED, snapshot);
+}
+
+async function scanMediaSuggestions() {
+  if (mediaSuggestionScanning || !mediaTargetService || !targetWindowController) return;
+  const status = targetWindowController.getStatus();
+  if (status === 'locked' || status === 'waiting') return;
+
+  mediaSuggestionScanning = true;
+  try {
+    const previousSnapshot = mediaTargetService.getSnapshot();
+    if (previousSnapshot.showingAll) return;
+    await mediaTargetService.scan();
+    const nextSnapshot = mediaTargetService.getSnapshot();
+    if (nextSnapshot.candidates.length > 0
+      || previousSnapshot.candidates.length !== nextSnapshot.candidates.length
+      || previousSnapshot.status !== nextSnapshot.status) {
+      broadcastSnapshot();
+    }
+  } catch (error) {
+    logger?.child('media-targets').debug(
+      'media.suggestion-scan.failed',
+      'Automatic media process detection did not complete.',
+      { error },
+    );
+  } finally {
+    mediaSuggestionScanning = false;
+  }
+}
+
+function startMediaSuggestionScanner() {
+  if (mediaSuggestionTimer) return;
+  mediaSuggestionTimer = setInterval(() => { void scanMediaSuggestions(); }, MEDIA_SUGGESTION_INTERVAL_MS);
+  if (typeof mediaSuggestionTimer.unref === 'function') mediaSuggestionTimer.unref();
+  void scanMediaSuggestions();
+}
+
+function stopMediaSuggestionScanner() {
+  if (!mediaSuggestionTimer) return;
+  clearInterval(mediaSuggestionTimer);
+  mediaSuggestionTimer = null;
 }
 
 function showMainWindow() {
@@ -567,6 +610,9 @@ async function initialize() {
   });
   targetWindowController = createTargetWindowController({
     adapter: windowAdapter,
+    focusDelayMs: process.platform === 'darwin' ? 450 : 100,
+    focusRetryDelayMs: process.platform === 'darwin' ? 250 : 100,
+    focusVerificationAttempts: process.platform === 'darwin' ? 3 : 2,
     onStatusChanged: () => {
       broadcastSnapshot();
       service?.broadcastControllerConfig();
@@ -583,7 +629,10 @@ async function initialize() {
     staticPath: app.isPackaged
       ? path.join(process.resourcesPath, 'dist')
       : path.join(app.getAppPath(), 'decktap-web', 'dist'),
-    keyboardController: createKeyboardController({ targetWindowController }),
+    keyboardController: createKeyboardController({
+      targetWindowController,
+      focusSettleDelayMs: process.platform === 'darwin' ? 220 : 0,
+    }),
     getControllerConfig: () => ({
       pageTurnMode: preferencesStore.get().pageTurnMode,
       target: {
@@ -626,6 +675,7 @@ async function initialize() {
   unsubscribeService = service.subscribe(broadcastSnapshot);
   await restoreLastLockedTarget();
   targetMonitor.start();
+  startMediaSuggestionScanner();
 
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
@@ -694,6 +744,7 @@ app.on('before-quit', (event) => {
     ))
     .finally(() => {
       targetMonitor?.stop();
+      stopMediaSuggestionScanner();
       unsubscribeService?.();
       trayController?.destroy();
       logger?.close();

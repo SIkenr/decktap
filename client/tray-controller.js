@@ -1,7 +1,6 @@
-// A small embedded PNG keeps the tray available before platform icon assets
-// are copied into a packaged app. NativeImage documents PNG data URLs on all
-// supported desktop platforms.
-const TRAY_ICON_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUEAYAAADdGcFOAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRP///////wlY99wAAAAHdElNRQfqCAgEDRrBCt6BAAACA0lEQVRIx2NgGAWUAUZCCpSVMzJevLCph/AyYyB0lAp1rF92B0JPX3L37owZEhJHGol2IMRhk65BeLma9AmvydchDs3Tgokw4Q8xejkMBnI1Ue3H4kAIgEXlQAGE/TgcSK00Ri5A2M9CqtZbztPOiV9kYGCayXiSwY2B4V/6f3OGXQwM3yp/lv1nZGB4tP610d+rDAzbHc4J/EhlYJjTvpv7Wz0Dw+9zf/P/l5LuVCbStaCChbv2zfnGzcCww/6c4M9UBgaZHcJszM8YGIoN/QV5uBkYZmlnXRSQY2BgvMc4g0F8ABw4LWxH1dcvDAwVrItXfzzJwODp0Dzx7VMGhk/u357+L2NgsK3XMmXLY2Cwt9JOY58zAA5EBy/nfvj8t4+B4VDjtdO/JiHEjSWVhVkjBoED4QbvYTRg0EPw/yv/T2d4OQgcKJ4swMtcxMBgu0BrLls4QvzckXttv/eTbh7JuRgdZK3yaOPmYWDgUeAMZlJgYHA/YLCfPZeBgfcOpzRjMQPDYWhUHzx2ddbPPAYGBiWGDFJCkmIHxrs5pXB9ZWD4Hv5L4f8pBobHvW+0/r5hYJizZk/lTx4GhtlXdxV9zWBg+K/0nySHwQBGXQypapbehvAGqsBedgdSJ0er4kiD05cMjMMw7R96rRkYQFVo2wChYe03agGYebYN6A4bMgAA9YS8/KUQF2YAAAAASUVORK5CYII=';
+// Keep this as a monochrome transparent PNG. macOS template tray icons use the
+// image alpha mask and can render colorful app icons as blank in the menu bar.
+const TRAY_ICON_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAxklEQVR4Ae3BsUkDUQAA0JfvKaRI4wJWWlwZBN1AzAYOYOEOJyK5DbJAGnsbv7iBhY3NFRJSuIaNxRWfHF/4BCyUvGfn7xrJe8JML2KCKcZYI2KBlR/syXuQHOMIBxjhEGe4wSfeZQTlOjyi09vHEjMZlTK3aCUN5nr3iAaCMq1NLZ71TnFuINjei6Q2EPySYHsXks5AUKaxqcGl3hteDVTKzHGFD5ygltzJqJSrUUu+cI0oo5IXMdOLmGCKMdaIWGBl5//5BkbkH+g/3mWJAAAAAElFTkSuQmCC';
 
 function createTrayController(options = {}) {
   const Tray = options.Tray;

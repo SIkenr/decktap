@@ -93,6 +93,56 @@ test('keyboard controller focuses a locked target before sending a key', async (
   assert.deepEqual(calls, ['focus', 'press', 'release']);
 });
 
+test('keyboard controller waits after focus restoration before sending a key', async () => {
+  const calls = [];
+  const controller = createKeyboardController({
+    focusSettleDelayMs: 220,
+    wait: async (milliseconds) => calls.push(['wait', milliseconds]),
+    targetWindowController: {
+      async ensureFocused() {
+        calls.push(['focus']);
+        return { status: 'focused', focusChanged: true };
+      },
+    },
+    keyboard: {
+      async pressKey() {
+        calls.push(['press']);
+      },
+      async releaseKey() {
+        calls.push(['release']);
+      },
+    },
+  });
+
+  await controller.execute('next');
+  assert.deepEqual(calls, [['focus'], ['wait', 220], ['press'], ['release']]);
+});
+
+test('keyboard controller does not add a settle delay when the target already had focus', async () => {
+  const calls = [];
+  const controller = createKeyboardController({
+    focusSettleDelayMs: 220,
+    wait: async (milliseconds) => calls.push(['wait', milliseconds]),
+    targetWindowController: {
+      async ensureFocused() {
+        calls.push(['focus']);
+        return { status: 'focused', focusChanged: false };
+      },
+    },
+    keyboard: {
+      async pressKey() {
+        calls.push(['press']);
+      },
+      async releaseKey() {
+        calls.push(['release']);
+      },
+    },
+  });
+
+  await controller.execute('next');
+  assert.deepEqual(calls, [['focus'], ['press'], ['release']]);
+});
+
 test('keyboard controller does not send a key when target focus fails', async () => {
   let keyWasPressed = false;
   const controller = createKeyboardController({

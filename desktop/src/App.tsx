@@ -1061,6 +1061,12 @@ export function App() {
 
   if (!snapshot) return <LoadingScreen />;
 
+  const suggestedCandidate = snapshot.target.status !== 'locked'
+    && snapshot.target.status !== 'waiting'
+    && snapshot.mediaTargets.candidates.length > 0
+    ? snapshot.mediaTargets.candidates[0]
+    : null;
+
   const runAction = async (action: () => Promise<AppSnapshot>) => {
     setBusy(true);
     setActionError('');
@@ -1109,6 +1115,11 @@ export function App() {
 
   const selectMediaTarget = (candidateId: string) => {
     void runAction(() => window.decktap.selectMediaTarget(candidateId));
+  };
+
+  const lockSuggestedCandidate = () => {
+    if (!suggestedCandidate) return;
+    selectMediaTarget(suggestedCandidate.id);
   };
 
   const quickLockMediaApp = async (ruleId: string) => {
@@ -1224,6 +1235,22 @@ export function App() {
         </header>
 
         {actionError && <div className="error-banner" role="alert">{actionError}</div>}
+        {suggestedCandidate && activePage !== 'target' && (
+          <div className="media-suggestion-banner" role="status">
+            <div>
+              <strong>检测到可锁定软件：{suggestedCandidate.appName}</strong>
+              <span>{snapshot.mediaTargets.candidates.length > 1 ? `还有 ${snapshot.mediaTargets.candidates.length - 1} 个候选目标` : '可以锁定后再用手机翻页'}</span>
+            </div>
+            <div>
+              <button className="secondary-button" type="button" disabled={busy} onClick={() => setActivePage('target')}>
+                查看候选
+              </button>
+              <button className="primary-button" type="button" disabled={busy} onClick={lockSuggestedCandidate}>
+                锁定
+              </button>
+            </div>
+          </div>
+        )}
 
         {activePage === 'home' ? (
           <HomePage

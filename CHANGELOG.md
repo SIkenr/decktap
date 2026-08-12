@@ -2,6 +2,31 @@
 
 DeckTap 目前发布的是未签名测试构建。以下记录描述桌面端、手机控制端和打包产物的主要变化。
 
+## [1.0.15](https://github.com/SIkenr/decktap/releases/tag/v1.0.15) - 2026-08-12
+
+### 新增
+
+- 加入应用图标资源和图标生成脚本，Windows、macOS、托盘图标和手机端 Logo 使用统一的 DeckTap 视觉标识。
+- 新增演示软件进程白名单文档，覆盖 PowerPoint、Keynote、WPS、ProPresenter、极演投影、PDF 阅读器和常见媒体播放器。
+- 桌面端新增自动识别提示：发现正在运行的演示或媒体软件后，可直接从首页快捷锁定目标。
+
+### 优化
+
+- macOS 在辅助功能窗口枚举拿不到窗口时，会通过受控白名单进程兜底发现演示软件。
+- macOS 锁定最小化窗口前会先尝试恢复窗口，再执行激活和焦点验证。
+- Windows 进程兜底发现仅暴露白名单内的演示或媒体软件，避免把无关进程加入目标列表。
+- 翻页前增加焦点重试和稳定等待，减少目标窗口刚恢复时按键过早发送的情况。
+- Release 打包产物继续使用精简统一命名：
+  - `DeckTap-1.0.15-win-x64.zip`
+  - `DeckTap-1.0.15-mac-arm64.zip`
+
+### 验证
+
+- `node --test`：107 项通过
+- `decktap-web` ESLint：通过
+- `decktap-web` Vite build：通过
+- 桌面端 TypeScript `--noEmit`：通过
+
 ## [1.0.6](https://github.com/SIkenr/decktap/releases/tag/v1.0.6) - 2026-08-11
 
 ### 新增

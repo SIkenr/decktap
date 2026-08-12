@@ -5,6 +5,7 @@ const { AutoUnpackNativesPlugin } = require('@electron-forge/plugin-auto-unpack-
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { VitePlugin } = require('@electron-forge/plugin-vite');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const path = require('node:path');
 
 // Linux can assemble an unsigned macOS test bundle, but cannot run Apple's
 // codesign tool after changing Electron's fuse wire. This opt-in is only for a
@@ -30,6 +31,7 @@ module.exports = {
     appBundleId: 'io.github.rico00121.decktap',
     asar: true,
     executableName: 'decktap',
+    icon: path.join(__dirname, 'assets', 'icon'),
     extraResource: ['decktap-web/dist'],
     ignore: ignoreUnbundledFiles,
     usageDescription: {
