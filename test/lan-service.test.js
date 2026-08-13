@@ -299,6 +299,39 @@ test('LAN service sends configuration only after pairing and broadcasts updates'
   await service.stop();
 });
 
+test('LAN service accepts page turn mode updates from paired controllers', async () => {
+  let pageTurnMode = 'vertical';
+  const updates = [];
+  const service = createTestService({
+    getControllerConfig: () => ({ pageTurnMode }),
+    onControllerConfigChanged: (patch) => {
+      updates.push(patch);
+      pageTurnMode = patch.pageTurnMode;
+    },
+  });
+  const info = await service.start();
+  const { socket } = await pairSocket(info);
+
+  const updatedMessagePromise = waitForJsonMessage(
+    socket,
+    ({ type, pageTurnMode: mode }) => type === 'controller-config' && mode === 'horizontal',
+  );
+  socket.send(JSON.stringify({
+    v: PROTOCOL_VERSION,
+    type: 'controller-setting',
+    setting: 'pageTurnMode',
+    value: 'horizontal',
+  }));
+
+  const updatedMessage = await updatedMessagePromise;
+  assert.equal(updatedMessage.pageTurnMode, 'horizontal');
+  assert.deepEqual(updates, [{ pageTurnMode: 'horizontal', source: 'controller' }]);
+
+  socket.close();
+  await once(socket, 'close');
+  await service.stop();
+});
+
 test('LAN service sends a sanitized target status to paired controllers', async () => {
   const service = createTestService({
     getControllerConfig: () => ({

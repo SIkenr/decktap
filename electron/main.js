@@ -4,6 +4,7 @@ import {
   app,
   BrowserWindow,
   clipboard,
+  dialog,
   ipcMain,
   Menu,
   nativeImage,
@@ -60,10 +61,13 @@ let trayController = null;
 let unsubscribeService = null;
 let mediaSuggestionTimer = null;
 let mediaSuggestionScanning = false;
+let switchSuggestionScanning = false;
+let lastSwitchSuggestionScanAt = 0;
 let isQuitting = false;
 
 const MACOS_ACCESSIBILITY_SETTINGS_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
 const MEDIA_SUGGESTION_INTERVAL_MS = 5000;
+const SWITCH_SUGGESTION_MIN_INTERVAL_MS = 2500;
 
 function isTrustedSender(event) {
   return Boolean(
@@ -103,10 +107,38 @@ function getPermissionStatus() {
   return systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'missing';
 }
 
+function checkStartupPermissions() {
+  const permissionStatus = getPermissionStatus();
+  if (permissionStatus === 'missing') {
+    systemPreferences.isTrustedAccessibilityClient(true);
+    logger?.child('permissions').warn(
+      'permission.startup-missing',
+      'macOS Accessibility permission is missing at startup.',
+      { permissionStatus },
+    );
+  }
+  return permissionStatus;
+}
+
 function rememberTargetRule(target, explicitRuleId = null) {
   const customRule = findCustomRule(target, preferencesStore.get().customApps);
   const builtInRule = findBuiltInRule(target);
-  preferencesStore.setLastLockedAppId(explicitRuleId || customRule?.id || builtInRule?.id || null);
+  const ruleId = explicitRuleId || customRule?.id || builtInRule?.id || null;
+  preferencesStore.setLastLockedAppId(ruleId);
+  return ruleId;
+}
+
+function applyTargetPageTurnDefaults(ruleId, source, target = null) {
+  const builtInRuleId = target ? findBuiltInRule(target)?.id : null;
+  if ((ruleId !== 'propresenter' && builtInRuleId !== 'propresenter')
+    || preferencesStore.get().pageTurnMode === 'horizontal') return false;
+  preferencesStore.setPageTurnMode('horizontal');
+  logger?.child('settings').info(
+    'settings.page-turn-mode.auto-horizontal',
+    'The page turn mode was switched to horizontal for ProPresenter.',
+    { pageTurnMode: 'horizontal', ruleId: ruleId || builtInRuleId, source },
+  );
+  return true;
 }
 
 async function restoreLastLockedTarget() {
@@ -116,6 +148,7 @@ async function restoreLastLockedTarget() {
   if (process.platform === 'darwin' && getPermissionStatus() !== 'granted') return;
   try {
     const result = await mediaTargetService.lockRule(ruleId);
+    if (result.outcome === 'locked') applyTargetPageTurnDefaults(result.ruleId, 'startup-restore', result.target);
     logger.child('media-targets').info(
       result.outcome === 'locked' ? 'media.target.restored' : 'media.target.restore-skipped',
       result.outcome === 'locked'
@@ -133,6 +166,42 @@ async function restoreLastLockedTarget() {
       'The previous media application could not be restored at startup.',
       { error, ruleId },
     );
+  }
+}
+
+async function lockSingleStartupMediaTarget() {
+  if (!mediaTargetService || !targetWindowController) return;
+  const status = targetWindowController.getStatus();
+  if (status === 'locked' || status === 'waiting') return;
+  if (!preferencesStore.get().welcomeCompleted) return;
+  if (process.platform === 'darwin' && getPermissionStatus() !== 'granted') return;
+
+  try {
+    const result = await mediaTargetService.lockSingleRecognizedCandidate();
+    if (result.outcome === 'locked') {
+      const ruleId = rememberTargetRule(result.target, result.ruleId);
+      applyTargetPageTurnDefaults(ruleId, 'startup-auto-lock', result.target);
+      service?.broadcastControllerConfig();
+    }
+    logger.child('media-targets').info(
+      result.outcome === 'locked' ? 'media.target.startup-auto-locked' : 'media.target.startup-scan-completed',
+      result.outcome === 'locked'
+        ? 'One recognized media application was automatically locked at startup.'
+        : 'Startup media detection completed without an automatic lock.',
+      {
+        outcome: result.outcome,
+        ruleId: result.ruleId || null,
+        candidateCount: result.candidateCount ?? mediaTargetService.getSnapshot().candidates.length,
+      },
+    );
+  } catch (error) {
+    logger.child('media-targets').warn(
+      'media.target.startup-scan-failed',
+      'Startup media detection failed.',
+      { error },
+    );
+  } finally {
+    broadcastSnapshot();
   }
 }
 
@@ -177,6 +246,7 @@ function createSnapshot() {
       launchAtLogin: loginItemController?.getEnabled() || false,
       launchAtLoginSupported: loginItemController?.isSupported() || false,
       startServiceOnLaunch: preferences.startServiceOnLaunch,
+      welcomeCompleted: preferences.welcomeCompleted,
     },
     target: (() => {
       const target = targetWindowController?.getTarget() || null;
@@ -207,6 +277,8 @@ async function scanMediaSuggestions() {
   if (mediaSuggestionScanning || !mediaTargetService || !targetWindowController) return;
   const status = targetWindowController.getStatus();
   if (status === 'locked' || status === 'waiting') return;
+  if (!preferencesStore.get().welcomeCompleted) return;
+  if (process.platform === 'darwin' && getPermissionStatus() !== 'granted') return;
 
   mediaSuggestionScanning = true;
   try {
@@ -227,6 +299,44 @@ async function scanMediaSuggestions() {
     );
   } finally {
     mediaSuggestionScanning = false;
+  }
+}
+
+async function scanSwitchSuggestions(ruleId) {
+  if (switchSuggestionScanning || !mediaTargetService || !targetWindowController) return;
+  if (!ruleId || targetWindowController.getStatus() === 'locked') return;
+  if (!preferencesStore.get().welcomeCompleted) return;
+  if (process.platform === 'darwin' && getPermissionStatus() !== 'granted') return;
+
+  const now = Date.now();
+  if (now - lastSwitchSuggestionScanAt < SWITCH_SUGGESTION_MIN_INTERVAL_MS) return;
+  lastSwitchSuggestionScanAt = now;
+  switchSuggestionScanning = true;
+  try {
+    const previousSnapshot = mediaTargetService.getSnapshot();
+    if (previousSnapshot.showingAll) return;
+    await mediaTargetService.scanRecognizedCandidates({ excludeRuleId: ruleId });
+    const nextSnapshot = mediaTargetService.getSnapshot();
+    if (nextSnapshot.candidates.length > 0
+      || previousSnapshot.candidates.length !== nextSnapshot.candidates.length
+      || previousSnapshot.status !== nextSnapshot.status) {
+      logger?.child('media-targets').info(
+        nextSnapshot.candidates.length > 0 ? 'media.target.switch-candidates-found' : 'media.target.switch-candidates-empty',
+        nextSnapshot.candidates.length > 0
+          ? 'Alternative presentation applications were detected after the locked target disappeared.'
+          : 'No alternative presentation applications were detected after the locked target disappeared.',
+        { ruleId, candidateCount: nextSnapshot.candidates.length },
+      );
+      broadcastSnapshot();
+    }
+  } catch (error) {
+    logger?.child('media-targets').debug(
+      'media.target.switch-scan.failed',
+      'Alternative media process detection did not complete.',
+      { error, ruleId },
+    );
+  } finally {
+    switchSuggestionScanning = false;
   }
 }
 
@@ -369,7 +479,8 @@ function registerIpcHandlers() {
     targetWindowController.arm();
     const result = await mediaTargetService.lockRule(safeRuleId);
     if (result.outcome === 'locked') {
-      rememberTargetRule(result.target, result.ruleId);
+      const ruleId = rememberTargetRule(result.target, result.ruleId);
+      applyTargetPageTurnDefaults(ruleId, 'quick-lock', result.target);
       service.broadcastControllerConfig();
     }
     logger.child('media-targets').info('media.quick-lock.completed', 'A quick media target action completed.', {
@@ -383,16 +494,27 @@ function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.SELECT_MEDIA_TARGET, async (event, candidateId) => {
     requireTrustedSender(event);
     const safeCandidateId = requireShortString(candidateId, 'Candidate identifier', 100);
-    const selection = await mediaTargetService.selectCandidate(safeCandidateId);
-    const { target } = selection;
-    rememberTargetRule(target, selection.ruleId);
-    logger.child('media-targets').info('media.target.selected', 'A scanned media target was selected.', {
-      appName: target.appName,
-      platform: target.platform,
-    });
-    broadcastSnapshot();
-    service.broadcastControllerConfig();
-    return createSnapshot();
+    try {
+      const selection = await mediaTargetService.selectCandidate(safeCandidateId);
+      const { target } = selection;
+      const ruleId = rememberTargetRule(target, selection.ruleId);
+      applyTargetPageTurnDefaults(ruleId, 'candidate-selection', target);
+      logger.child('media-targets').info('media.target.selected', 'A scanned media target was selected.', {
+        appName: target.appName,
+        platform: target.platform,
+      });
+      broadcastSnapshot();
+      service.broadcastControllerConfig();
+      return createSnapshot();
+    } catch (error) {
+      logger.child('media-targets').error(
+        'media.target.select-failed',
+        'A scanned media target could not be selected.',
+        { error },
+      );
+      broadcastSnapshot();
+      throw error;
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.ADD_CUSTOM_APP, async (event, payload) => {
@@ -437,7 +559,8 @@ function registerIpcHandlers() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 350));
       const target = await targetWindowController.captureCurrent();
-      rememberTargetRule(target);
+      const ruleId = rememberTargetRule(target);
+      applyTargetPageTurnDefaults(ruleId, 'manual-capture', target);
       logger.child('target-window').info('target.captured', 'A presentation target was captured.', {
         appName: target.appName,
         platform: target.platform,
@@ -458,11 +581,23 @@ function registerIpcHandlers() {
     return createSnapshot();
   });
 
-  ipcMain.handle(IPC_CHANNELS.CLEAR_TARGET, (event) => {
+  ipcMain.handle(IPC_CHANNELS.CLEAR_TARGET, async (event) => {
     requireTrustedSender(event);
     targetWindowController.clear();
     preferencesStore.setLastLockedAppId(null);
     logger.child('target-window').info('target.cleared', 'The presentation target was cleared.');
+    if (preferencesStore.get().welcomeCompleted
+      && (process.platform !== 'darwin' || getPermissionStatus() === 'granted')) {
+      try {
+        await mediaTargetService.scanRecognizedCandidates();
+      } catch (error) {
+        logger.child('media-targets').debug(
+          'media.clear-scan.failed',
+          'Media process detection after clearing the target did not complete.',
+          { error },
+        );
+      }
+    }
     broadcastSnapshot();
     service.broadcastControllerConfig();
     return createSnapshot();
@@ -496,6 +631,28 @@ function registerIpcHandlers() {
     if (!THEME_SOURCES.has(themeSource)) throw new TypeError('Unsupported theme source');
     preferencesStore.setThemeSource(themeSource);
     nativeTheme.themeSource = themeSource;
+    broadcastSnapshot();
+    return createSnapshot();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SET_WELCOME_COMPLETED, async (event, completed) => {
+    requireTrustedSender(event);
+    const safeCompleted = requireBoolean(completed, 'Welcome setting');
+    preferencesStore.setWelcomeCompleted(safeCompleted);
+    logger.child('settings').info('settings.welcome.changed', 'The welcome screen setting was changed.', {
+      completed: safeCompleted,
+    });
+    if (safeCompleted && (process.platform !== 'darwin' || getPermissionStatus() === 'granted')) {
+      try {
+        await mediaTargetService.scanRecognizedCandidates();
+      } catch (error) {
+        logger.child('media-targets').debug(
+          'media.welcome-scan.failed',
+          'Media process detection after the welcome screen did not complete.',
+          { error },
+        );
+      }
+    }
     broadcastSnapshot();
     return createSnapshot();
   });
@@ -547,7 +704,7 @@ function registerIpcHandlers() {
   });
 }
 
-function createWindow() {
+function createWindow({ showOnReady = false } = {}) {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -569,12 +726,27 @@ function createWindow() {
   mainWindow.removeMenu();
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  mainWindow.once('ready-to-show', () => {
+    if (showOnReady) mainWindow?.show();
+  });
   mainWindow.on('close', (event) => {
-    if (isQuitting || !preferencesStore?.get().closeToTray) return;
-    event.preventDefault();
-    mainWindow?.hide();
-    logger?.child('window').info('window.hidden-to-tray', 'The main window was hidden to the system tray.');
+    if (isQuitting) return;
+    if (preferencesStore?.get().closeToTray) {
+      event.preventDefault();
+      mainWindow?.hide();
+      logger?.child('window').info('window.hidden-to-tray', 'The main window was hidden to the system tray.');
+      return;
+    }
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'question',
+      buttons: ['退出 DeckTap', '取消'],
+      defaultId: 1,
+      cancelId: 1,
+      title: '退出 DeckTap',
+      message: '关闭窗口将退出 DeckTap，并停止手机控制服务。',
+      detail: '如果想关闭窗口后继续在托盘运行，请在应用设置中重新开启“关闭窗口时继续在托盘运行”。',
+    });
+    if (choice !== 0) event.preventDefault();
   });
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -640,6 +812,15 @@ async function initialize() {
         status: targetWindowController.getStatus(),
       },
     }),
+    onControllerConfigChanged: ({ pageTurnMode }) => {
+      if (!PAGE_TURN_MODES.has(pageTurnMode)) throw new TypeError('Unsupported page-turn mode');
+      preferencesStore.setPageTurnMode(pageTurnMode);
+      logger.child('settings').info('settings.page-turn-mode.changed', 'The page turn mode was changed by a controller.', {
+        pageTurnMode,
+        source: 'controller',
+      });
+      broadcastSnapshot();
+    },
     logger: logger.child('lan-service'),
     trustedClientStore,
   });
@@ -649,6 +830,7 @@ async function initialize() {
     getRuleId: () => preferencesStore.get().lastLockedAppId,
     canMonitor: () => process.platform !== 'darwin' || getPermissionStatus() === 'granted',
     onRebound: ({ ruleId }) => {
+      applyTargetPageTurnDefaults(ruleId, 'target-rebound');
       logger.child('media-targets').info(
         'media.target.auto-rebound',
         'A presentation playback window was automatically locked after it appeared.',
@@ -666,6 +848,9 @@ async function initialize() {
       broadcastSnapshot();
       service.broadcastControllerConfig();
     },
+    onUnresolved: ({ ruleId }) => {
+      void scanSwitchSuggestions(ruleId);
+    },
     onError: (error, ruleId) => logger.child('media-targets').warn(
       'media.target.monitor-failed',
       'The target monitor could not inspect presentation windows.',
@@ -673,7 +858,10 @@ async function initialize() {
     ),
   });
   unsubscribeService = service.subscribe(broadcastSnapshot);
-  await restoreLastLockedTarget();
+  checkStartupPermissions();
+  preferencesStore.setLastLockedAppId(null);
+  targetWindowController.clear();
+  await lockSingleStartupMediaTarget();
   targetMonitor.start();
   startMediaSuggestionScanner();
 
@@ -725,7 +913,11 @@ if (!hasSingleInstanceLock) {
 }
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0 && preferencesStore) createWindow();
+  if (BrowserWindow.getAllWindows().length === 0 && preferencesStore) {
+    createWindow({ showOnReady: true });
+    return;
+  }
+  showMainWindow();
 });
 
 app.on('window-all-closed', () => {

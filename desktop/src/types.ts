@@ -72,6 +72,7 @@ export interface AppSnapshot {
     launchAtLogin: boolean;
     launchAtLoginSupported: boolean;
     startServiceOnLaunch: boolean;
+    welcomeCompleted: boolean;
   };
   target: {
     appName: string | null;
@@ -108,6 +109,7 @@ export interface DeckTapApi {
   setLaunchAtLogin(enabled: boolean): Promise<AppSnapshot>;
   setStartServiceOnLaunch(enabled: boolean): Promise<AppSnapshot>;
   setTheme(themeSource: ThemeSource): Promise<AppSnapshot>;
+  setWelcomeCompleted(completed: boolean): Promise<AppSnapshot>;
   startService(): Promise<AppSnapshot>;
   stopService(): Promise<AppSnapshot>;
   onSnapshotChanged(callback: (snapshot: AppSnapshot) => void): () => void;

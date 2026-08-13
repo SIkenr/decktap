@@ -186,6 +186,73 @@ test('quick rule does not guess when the application has multiple windows', asyn
   assert.deepEqual(locked, []);
 });
 
+test('startup discovery locks exactly one recognized candidate', async () => {
+  const { locked, service } = createService([notesWindow, powerPointWindow]);
+  const result = await service.lockSingleRecognizedCandidate();
+
+  assert.equal(result.outcome, 'locked');
+  assert.equal(result.ruleId, 'powerpoint');
+  assert.equal(result.target.id, powerPointWindow.id);
+  assert.deepEqual(locked, [powerPointWindow]);
+});
+
+test('startup discovery prompts instead of guessing with multiple recognized candidates', async () => {
+  const secondPowerPointWindow = { ...powerPointWindow, id: 'window-powerpoint-2', processId: 12 };
+  const { locked, service } = createService([powerPointWindow, secondPowerPointWindow]);
+  const result = await service.lockSingleRecognizedCandidate();
+
+  assert.equal(result.outcome, 'multiple');
+  assert.equal(result.candidateCount, 2);
+  assert.equal(service.getSnapshot().status, 'multiple-candidates');
+  assert.deepEqual(locked, []);
+});
+
+test('startup discovery ignores unrecognized windows', async () => {
+  const { locked, service } = createService([notesWindow]);
+  const result = await service.lockSingleRecognizedCandidate();
+
+  assert.equal(result.outcome, 'not-running');
+  assert.equal(result.candidateCount, 0);
+  assert.equal(service.getSnapshot().status, 'single-candidate');
+  assert.deepEqual(locked, []);
+});
+
+test('default candidate identifiers remain stable across repeated scans', async () => {
+  const locked = [];
+  const service = createMediaTargetService({
+    adapter: { async listWindows() { return [powerPointWindow]; } },
+    targetWindowController: {
+      getTarget: () => locked.at(-1) || null,
+      async lock(window) {
+        locked.push(window);
+      },
+    },
+  });
+  const first = await service.scan();
+  const second = await service.scan();
+
+  assert.equal(first.candidates[0].id, second.candidates[0].id);
+  await service.selectCandidate(first.candidates[0].id);
+  assert.deepEqual(locked, [powerPointWindow]);
+});
+
+test('recognized-only scan excludes the current rule and never exposes unrecognized windows', async () => {
+  const keynoteWindow = {
+    ...powerPointWindow,
+    id: 'keynote-window',
+    appName: 'Keynote',
+    bundleId: 'com.apple.Keynote',
+    platform: 'darwin',
+  };
+  const { service } = createService([notesWindow, powerPointWindow, keynoteWindow]);
+  const result = await service.scanRecognizedCandidates({ excludeRuleId: 'powerpoint' });
+
+  assert.equal(result.status, 'single-candidate');
+  assert.deepEqual(result.candidates.map(({ appName, ruleId, recognition }) => [appName, ruleId, recognition]), [
+    ['Apple Keynote', 'keynote', 'built-in'],
+  ]);
+});
+
 test('quick rule reports an application that is not running and rejects unknown rules', async () => {
   const { service } = createService([notesWindow]);
   assert.equal((await service.lockRule('keynote')).outcome, 'not-running');

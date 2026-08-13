@@ -5,6 +5,7 @@ function createTargetMonitor(options = {}) {
   const canMonitor = options.canMonitor || (() => true);
   const intervalMs = options.intervalMs ?? 1500;
   const onRebound = options.onRebound || (() => {});
+  const onUnresolved = options.onUnresolved || (() => {});
   const onWaiting = options.onWaiting || (() => {});
   const onError = options.onError || (() => {});
   const schedule = options.setInterval || setInterval;
@@ -47,9 +48,12 @@ function createTargetMonitor(options = {}) {
       if (result.outcome === 'locked') {
         lastOutcome = 'locked';
         onRebound(result);
-      } else if (result.outcome !== lastOutcome) {
-        lastOutcome = result.outcome;
-        onWaiting(result);
+      } else {
+        onUnresolved(result);
+        if (result.outcome !== lastOutcome) {
+          lastOutcome = result.outcome;
+          onWaiting(result);
+        }
       }
       return result;
     } catch (error) {

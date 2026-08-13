@@ -2,13 +2,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const DEFAULT_PREFERENCES = Object.freeze({
-  closeToTray: false,
+  closeToTray: true,
   customApps: Object.freeze([]),
   lastLockedAppId: null,
   launchAtLogin: false,
   pageTurnMode: 'vertical',
   startServiceOnLaunch: true,
   themeSource: 'system',
+  welcomeCompleted: false,
 });
 
 const PAGE_TURN_MODES = new Set(['vertical', 'horizontal']);
@@ -41,7 +42,7 @@ function sanitizePreferences(candidate = {}) {
     ? candidate.lastLockedAppId.trim().slice(0, 80) || null
     : null;
   return {
-    closeToTray: candidate.closeToTray === true,
+    closeToTray: candidate.closeToTray !== false,
     customApps: sanitizeCustomApps(candidate.customApps),
     launchAtLogin: candidate.launchAtLogin === true,
     lastLockedAppId,
@@ -52,6 +53,7 @@ function sanitizePreferences(candidate = {}) {
     themeSource: THEME_SOURCES.has(candidate.themeSource)
       ? candidate.themeSource
       : DEFAULT_PREFERENCES.themeSource,
+    welcomeCompleted: candidate.welcomeCompleted === true,
   };
 }
 
@@ -91,7 +93,7 @@ function createPreferencesStore(options = {}) {
     if (patch.customApps !== undefined && !Array.isArray(patch.customApps)) {
       throw new TypeError('Custom applications must be an array');
     }
-    for (const key of ['closeToTray', 'launchAtLogin', 'startServiceOnLaunch']) {
+    for (const key of ['closeToTray', 'launchAtLogin', 'startServiceOnLaunch', 'welcomeCompleted']) {
       if (patch[key] !== undefined && typeof patch[key] !== 'boolean') {
         throw new TypeError(`Unsupported boolean preference: ${key}`);
       }
@@ -125,6 +127,7 @@ function createPreferencesStore(options = {}) {
     setPageTurnMode: (pageTurnMode) => update({ pageTurnMode }),
     setStartServiceOnLaunch: (startServiceOnLaunch) => update({ startServiceOnLaunch }),
     setThemeSource: (themeSource) => update({ themeSource }),
+    setWelcomeCompleted: (welcomeCompleted) => update({ welcomeCompleted }),
   };
 }
 

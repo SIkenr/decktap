@@ -31,8 +31,11 @@ module.exports = {
     appBundleId: 'io.github.rico00121.decktap',
     asar: true,
     executableName: 'decktap',
+    extendInfo: {
+      CFBundleIconFile: 'icon.icns',
+    },
     icon: path.join(__dirname, 'assets', 'icon'),
-    extraResource: ['decktap-web/dist'],
+    extraResource: ['decktap-web/dist', path.join(__dirname, 'assets', 'icon.icns')],
     ignore: ignoreUnbundledFiles,
     usageDescription: {
       AppleEvents: 'DeckTap uses System Events to identify and restore the presentation window you explicitly lock.',

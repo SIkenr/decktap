@@ -36,6 +36,18 @@ assert.doesNotMatch(mainBundle, /WS_NO_BUFFER_UTIL|bufferutil/, 'The broken opti
 if (!isMacOS) {
   assert.match(mainBundle, /-EncodedCommand/, 'The encoded Windows window adapter is missing');
   assert.doesNotMatch(mainBundle, /["']-Command["']/, 'The unsafe PowerShell command form is still bundled');
+} else {
+  const plistPath = path.join(packageRoot, 'Contents', 'Info.plist');
+  const plist = fs.readFileSync(plistPath, 'utf8');
+  const iconMatch = plist.match(/<key>CFBundleIconFile<\/key>\s*<string>([^<]+)<\/string>/);
+  assert.ok(iconMatch, 'The macOS bundle does not declare CFBundleIconFile');
+  const iconFile = iconMatch[1].endsWith('.icns') ? iconMatch[1] : `${iconMatch[1]}.icns`;
+  assert.equal(iconFile, 'icon.icns', 'The macOS bundle points at the wrong app icon');
+  assert.equal(
+    fs.existsSync(path.join(packageRoot, 'Contents', 'Resources', iconFile)),
+    true,
+    'The macOS bundle icon is missing from Contents/Resources',
+  );
 }
 
 const nativePlatform = isMacOS ? 'darwin-x64+arm64' : 'win32-x64';

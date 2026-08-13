@@ -315,6 +315,17 @@ export function useWebSocket() {
     }
   }, []);
 
+  const sendPageTurnMode = useCallback((mode: ControllerPageTurnMode) => {
+    if (pairedRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        v: PROTOCOL_VERSION,
+        type: 'controller-setting',
+        setting: 'pageTurnMode',
+        value: mode,
+      }));
+    }
+  }, []);
+
   useEffect(() => {
     pairingTokenRef.current = readPairingToken();
     shouldReconnectRef.current = true;
@@ -348,6 +359,7 @@ export function useWebSocket() {
     pairingError,
     pairingStage,
     sendCommand,
+    sendPageTurnMode,
     submitPairingCode,
   };
 }

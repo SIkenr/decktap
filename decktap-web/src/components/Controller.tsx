@@ -84,6 +84,7 @@ export function Controller() {
     pairingError,
     pairingStage,
     sendCommand,
+    sendPageTurnMode,
     submitPairingCode,
   } = useWebSocket();
 
@@ -99,6 +100,7 @@ export function Controller() {
 
   const changePageTurnMode = (mode: PageTurnMode) => {
     setPageTurnMode(mode);
+    sendPageTurnMode(mode);
     try {
       window.localStorage.setItem(PAGE_TURN_MODE_KEY, mode);
     } catch {

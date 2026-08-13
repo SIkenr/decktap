@@ -13,13 +13,14 @@ const {
 test('preferences use safe defaults and sanitize stored values', () => {
   assert.deepEqual(sanitizePreferences({}), DEFAULT_PREFERENCES);
   assert.deepEqual(sanitizePreferences({ pageTurnMode: 'horizontal', themeSource: 'dark' }), {
-    closeToTray: false,
+    closeToTray: true,
     customApps: [],
     lastLockedAppId: null,
     launchAtLogin: false,
     pageTurnMode: 'horizontal',
     startServiceOnLaunch: true,
     themeSource: 'dark',
+    welcomeCompleted: false,
   });
   assert.deepEqual(sanitizePreferences({ pageTurnMode: 'diagonal', themeSource: 'neon' }), DEFAULT_PREFERENCES);
 });
@@ -35,13 +36,14 @@ test('preferences persist theme and page-turn mode', (t) => {
 
   const reloaded = createPreferencesStore({ filePath });
   assert.deepEqual(reloaded.get(), {
-    closeToTray: false,
+    closeToTray: true,
     customApps: [],
     lastLockedAppId: null,
     launchAtLogin: false,
     pageTurnMode: 'horizontal',
     startServiceOnLaunch: true,
     themeSource: 'dark',
+    welcomeCompleted: false,
   });
 });
 
@@ -53,16 +55,18 @@ test('preferences migrate and persist desktop lifecycle settings', (t) => {
 
   const store = createPreferencesStore({ filePath });
   assert.equal(store.get().startServiceOnLaunch, true);
-  assert.equal(store.get().closeToTray, false);
+  assert.equal(store.get().closeToTray, true);
   assert.equal(store.get().launchAtLogin, false);
 
   store.setStartServiceOnLaunch(false);
   store.setCloseToTray(true);
   store.setLaunchAtLogin(true);
+  store.setWelcomeCompleted(true);
   const reloaded = createPreferencesStore({ filePath });
   assert.equal(reloaded.get().startServiceOnLaunch, false);
   assert.equal(reloaded.get().closeToTray, true);
   assert.equal(reloaded.get().launchAtLogin, true);
+  assert.equal(reloaded.get().welcomeCompleted, true);
 });
 
 test('preferences reject non-boolean lifecycle settings', (t) => {
@@ -74,6 +78,7 @@ test('preferences reject non-boolean lifecycle settings', (t) => {
   assert.throws(() => store.setCloseToTray('yes'), /boolean preference/);
   assert.throws(() => store.setLaunchAtLogin(1), /boolean preference/);
   assert.throws(() => store.setStartServiceOnLaunch(null), /boolean preference/);
+  assert.throws(() => store.setWelcomeCompleted('done'), /boolean preference/);
 });
 
 test('preferences persist and remove sanitized custom applications', (t) => {
