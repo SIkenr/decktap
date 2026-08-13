@@ -100,6 +100,20 @@ function normalizeIdentity(value) {
   return String(value || '').trim().toLocaleLowerCase('en-US');
 }
 
+function createStableCandidateId(window, recognition, index) {
+  const source = [
+    window?.platform,
+    window?.id,
+    window?.processId,
+    window?.appName,
+    window?.bundleId,
+    recognition?.kind,
+    recognition?.ruleId,
+    index,
+  ].map((value) => String(value || '')).join('\u001f');
+  return crypto.createHash('sha256').update(source).digest('hex').slice(0, 32);
+}
+
 function matchesIdentity(window, rule) {
   const appName = normalizeIdentity(window.appName);
   const bundleId = normalizeIdentity(window.bundleId);
@@ -183,7 +197,7 @@ function createMediaTargetService(options = {}) {
   const adapter = options.adapter;
   const targetWindowController = options.targetWindowController;
   const getCustomApps = options.getCustomApps || (() => []);
-  const createCandidateId = options.createCandidateId || (() => crypto.randomUUID());
+  const createCandidateId = options.createCandidateId || createStableCandidateId;
 
   if (!adapter || typeof adapter.listWindows !== 'function') {
     throw new TypeError('A window adapter with listWindows is required');
@@ -195,8 +209,51 @@ function createMediaTargetService(options = {}) {
   let candidateWindows = new Map();
   let snapshot = Object.freeze({ status: 'idle', candidates: [], scannedAt: null, showingAll: false });
 
+  function recognizeWindows(windows) {
+    const customApps = getCustomApps();
+    const recognized = [];
+    const unrecognized = [];
+
+    for (const window of windows) {
+      const customRule = findCustomRule(window, customApps);
+      const builtInRule = findBuiltInRule(window);
+      if (customRule) {
+        recognized.push({
+          window,
+          recognition: { kind: 'custom', displayName: customRule.displayName, ruleId: customRule.id },
+        });
+      } else if (builtInRule) {
+        recognized.push({
+          window,
+          recognition: { kind: 'built-in', displayName: builtInRule.displayName, ruleId: builtInRule.id },
+        });
+      } else {
+        unrecognized.push({ window, recognition: { kind: 'unrecognized', ruleId: null } });
+      }
+    }
+
+    return { recognized, unrecognized };
+  }
+
+  function publishCandidates(items, showingAll) {
+    candidateWindows = new Map();
+    const candidates = items.map(({ window, recognition }, index) => (
+      publicCandidate(window, index, recognition)
+    ));
+    const status = candidates.length === 0
+      ? 'empty'
+      : candidates.length === 1 ? 'single-candidate' : 'multiple-candidates';
+    snapshot = Object.freeze({
+      status,
+      candidates: Object.freeze(candidates),
+      scannedAt: Date.now(),
+      showingAll,
+    });
+    return snapshot;
+  }
+
   function publicCandidate(window, index, recognition) {
-    const candidateId = String(createCandidateId()).slice(0, 100);
+    const candidateId = String(createCandidateId(window, recognition, index)).slice(0, 100);
     candidateWindows.set(candidateId, { recognition, window });
     return Object.freeze({
       id: candidateId,
@@ -212,45 +269,12 @@ function createMediaTargetService(options = {}) {
     snapshot = Object.freeze({ status: 'scanning', candidates: [], scannedAt: null, showingAll });
     try {
       const windows = (await adapter.listWindows()).slice(0, MAX_CANDIDATES);
-      const customApps = getCustomApps();
-      const recognized = [];
-      const unrecognized = [];
-
-      for (const window of windows) {
-        const customRule = findCustomRule(window, customApps);
-        const builtInRule = findBuiltInRule(window);
-        if (customRule) {
-          recognized.push({
-            window,
-            recognition: { kind: 'custom', displayName: customRule.displayName, ruleId: customRule.id },
-          });
-        } else if (builtInRule) {
-          recognized.push({
-            window,
-            recognition: { kind: 'built-in', displayName: builtInRule.displayName, ruleId: builtInRule.id },
-          });
-        } else {
-          unrecognized.push({ window, recognition: { kind: 'unrecognized', ruleId: null } });
-        }
-      }
+      const { recognized, unrecognized } = recognizeWindows(windows);
 
       const selected = showingAll
         ? [...recognized, ...unrecognized]
         : recognized.length > 0 ? recognized : unrecognized;
-      candidateWindows = new Map();
-      const candidates = selected.map(({ window, recognition }, index) => (
-        publicCandidate(window, index, recognition)
-      ));
-      const status = candidates.length === 0
-        ? 'empty'
-        : candidates.length === 1 ? 'single-candidate' : 'multiple-candidates';
-      snapshot = Object.freeze({
-        status,
-        candidates: Object.freeze(candidates),
-        scannedAt: Date.now(),
-        showingAll,
-      });
-      return snapshot;
+      return publishCandidates(selected, showingAll);
     } catch (error) {
       candidateWindows = new Map();
       snapshot = Object.freeze({ status: 'error', candidates: [], scannedAt: Date.now(), showingAll });
@@ -339,12 +363,47 @@ function createMediaTargetService(options = {}) {
     return Object.freeze({ outcome: 'locked', ruleId, target: targetWindowController.getTarget() });
   }
 
+  async function lockSingleRecognizedCandidate() {
+    const result = await scan({ includeUnrecognized: false });
+    const candidates = result.candidates.filter((candidate) => candidate.recognition !== 'unrecognized');
+    if (candidates.length !== 1 || result.candidates.length !== 1) {
+      return Object.freeze({
+        outcome: candidates.length === 0 ? 'not-running' : 'multiple',
+        candidateCount: candidates.length,
+      });
+    }
+    const selection = await selectCandidate(candidates[0].id);
+    return Object.freeze({
+      outcome: 'locked',
+      ruleId: selection.ruleId,
+      target: selection.target,
+    });
+  }
+
+  async function scanRecognizedCandidates(scanOptions = {}) {
+    snapshot = Object.freeze({ status: 'scanning', candidates: [], scannedAt: null, showingAll: false });
+    try {
+      const excludeRuleId = typeof scanOptions.excludeRuleId === 'string' ? scanOptions.excludeRuleId : null;
+      const windows = (await adapter.listWindows()).slice(0, MAX_CANDIDATES);
+      const selected = recognizeWindows(windows).recognized.filter(({ recognition }) => (
+        !excludeRuleId || recognition.ruleId !== excludeRuleId
+      ));
+      return publishCandidates(selected, false);
+    } catch (error) {
+      candidateWindows = new Map();
+      snapshot = Object.freeze({ status: 'error', candidates: [], scannedAt: Date.now(), showingAll: false });
+      throw error;
+    }
+  }
+
   return {
     createCustomApp,
     getSnapshot: () => snapshot,
+    lockSingleRecognizedCandidate,
     lockRule,
     rebindRule,
     scan,
+    scanRecognizedCandidates,
     selectCandidate,
   };
 }

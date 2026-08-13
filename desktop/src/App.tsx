@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import keynoteIcon from './assets/app-icons/keynote.png';
 import perfectCastIcon from './assets/app-icons/perfectcast.png';
 import powerPointIcon from './assets/app-icons/powerpoint.png';
-import proPresenterIcon from './assets/app-icons/propresenter.svg';
+import proPresenterIcon from './assets/app-icons/propresenter.png';
 import wpsIcon from './assets/app-icons/wps.svg';
 
 import type {
@@ -59,6 +59,11 @@ const QUICK_TARGET_APPS = [
   { id: 'propresenter', label: 'ProPresenter', icon: proPresenterIcon, tone: 'propresenter' },
   { id: 'perfectcast', label: '极演投影', icon: perfectCastIcon, tone: 'perfectcast' },
 ] as const;
+
+function getCandidateIcon(candidate: MediaTargetCandidate) {
+  return QUICK_TARGET_APPS.find((app) => app.id === candidate.ruleId)
+    || { id: 'custom', label: candidate.appName, icon: '', tone: 'custom' };
+}
 
 function Logo() {
   return (
@@ -127,6 +132,160 @@ function formatConnectionTime(timestamp: number) {
   } catch {
     return '刚刚连接';
   }
+}
+
+function MediaCandidateDialog({
+  candidates,
+  mode,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  candidates: MediaTargetCandidate[];
+  mode: 'lock' | 'switch';
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: (candidate: MediaTargetCandidate) => void;
+}) {
+  const [selectedId, setSelectedId] = useState(candidates[0]?.id || '');
+  const selectedCandidate = candidates.find((candidate) => candidate.id === selectedId) || candidates[0] || null;
+
+  useEffect(() => {
+    setSelectedId(candidates[0]?.id || '');
+  }, [candidates]);
+
+  if (candidates.length === 0) return null;
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="media-candidate-dialog" role="dialog" aria-modal="true" aria-labelledby="media-candidate-title">
+        <div className="dialog-heading">
+          <div>
+            <p className="eyebrow">{mode === 'switch' ? '切换检测' : '软件检测'}</p>
+            <h2 id="media-candidate-title">
+              {candidates.length === 1
+                ? mode === 'switch' ? '检测到新的播放软件' : '检测到播放软件'
+                : `检测到 ${candidates.length} 个播放软件`}
+            </h2>
+          </div>
+          <button className="icon-button" type="button" aria-label="关闭" disabled={busy} onClick={onClose}>×</button>
+        </div>
+        <p className="dialog-copy">
+          {mode === 'switch'
+            ? '原锁定软件暂未恢复。选择新的播放软件并确认后，手机翻页会切换到该软件。'
+            : '选择要锁定的软件并确认，手机翻页会发送到该播放窗口。'}
+        </p>
+        <div className="media-candidate-grid" aria-label="播放软件候选">
+          {candidates.map((candidate) => {
+            const icon = getCandidateIcon(candidate);
+            const selected = candidate.id === selectedCandidate?.id;
+            return (
+              <button
+                key={candidate.id}
+                type="button"
+                className={`media-candidate-option ${selected ? 'selected' : ''}`}
+                aria-pressed={selected}
+                disabled={busy}
+                onClick={() => setSelectedId(candidate.id)}
+                onDoubleClick={() => onConfirm(candidate)}
+              >
+                <span className={`quick-target-icon ${icon.tone}`} aria-hidden="true">
+                  {icon.icon ? <img src={icon.icon} alt="" /> : '+'}
+                </span>
+                <strong>{candidate.appName}</strong>
+                <small>{candidate.windowLabel}</small>
+              </button>
+            );
+          })}
+        </div>
+        <div className="dialog-actions">
+          <button className="secondary-button" type="button" disabled={busy} onClick={onClose}>稍后处理</button>
+          <button
+            className="primary-button"
+            type="button"
+            disabled={busy || !selectedCandidate}
+            onClick={() => selectedCandidate && onConfirm(selectedCandidate)}
+          >
+            {mode === 'switch' ? '确认切换并锁定' : '确认锁定'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function WelcomeDialog({
+  snapshot,
+  busy,
+  onComplete,
+  onOpenPermissionSettings,
+  onRefreshPermissions,
+}: {
+  snapshot: AppSnapshot;
+  busy: boolean;
+  onComplete: () => void;
+  onOpenPermissionSettings: () => void;
+  onRefreshPermissions: () => void;
+}) {
+  const permissionMissing = snapshot.permissionStatus === 'missing';
+  const needsAccessibility = snapshot.permissionStatus !== 'not-required';
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section className="welcome-dialog" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+        <div className="welcome-hero">
+          <Logo />
+          <div>
+            <p className="eyebrow">欢迎使用</p>
+            <h2 id="welcome-title">DeckTap</h2>
+            <p>用手机在同一局域网内控制电脑上的演示和播放软件。</p>
+          </div>
+        </div>
+
+        <div className="welcome-step-grid">
+          <div>
+            <span className="welcome-step-icon">1</span>
+            <strong>连接手机</strong>
+            <small>打开首页二维码，手机扫码后输入数字配对码。</small>
+          </div>
+          <div>
+            <span className="welcome-step-icon">2</span>
+            <strong>锁定播放软件</strong>
+            <small>DeckTap 会检测白名单播放软件，并在确认后把翻页发送给它。</small>
+          </div>
+          {needsAccessibility && (
+            <div>
+              <span className="welcome-step-icon">3</span>
+              <strong>授权辅助功能</strong>
+              <small>macOS 需要此权限来恢复窗口焦点并发送翻页按键。</small>
+            </div>
+          )}
+        </div>
+
+        {needsAccessibility && permissionMissing ? (
+          <div className="welcome-permission-panel" role="alert">
+            <strong>需要开启辅助功能权限</strong>
+            <span>授权完成后回到 DeckTap，点击“重新检测”，再开始选择播放软件。</span>
+          </div>
+        ) : needsAccessibility ? (
+          <div className="welcome-permission-panel ready">
+            <strong>系统权限已就绪</strong>
+            <span>结束欢迎页后，会开始检测当前已打开的播放软件。</span>
+          </div>
+        ) : null}
+
+        <div className="dialog-actions">
+          {permissionMissing ? (
+            <>
+              <button className="primary-outline-button" type="button" disabled={busy} onClick={onRefreshPermissions}>重新检测</button>
+              <button className="primary-button" type="button" disabled={busy} onClick={onOpenPermissionSettings}>打开辅助功能设置</button>
+            </>
+          ) : (
+            <button className="primary-button" type="button" disabled={busy} onClick={onComplete}>开始使用</button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function DevicesPage({
@@ -351,6 +510,7 @@ function SettingsPage({
   onLaunchAtLoginChange,
   onStartServiceOnLaunchChange,
   onThemeChange,
+  onWelcomeCompletedChange,
 }: {
   snapshot: AppSnapshot;
   busy: boolean;
@@ -358,6 +518,7 @@ function SettingsPage({
   onLaunchAtLoginChange: (enabled: boolean) => void;
   onStartServiceOnLaunchChange: (enabled: boolean) => void;
   onThemeChange: (theme: ThemeSource) => void;
+  onWelcomeCompletedChange: (completed: boolean) => void;
 }) {
   return (
     <div className="settings-page-stack">
@@ -391,6 +552,13 @@ function SettingsPage({
               ? '由 Windows 或 macOS 管理登录启动项。'
               : '该选项仅在正式打包的 Windows 和 macOS 客户端中开放。'}
             onChange={onLaunchAtLoginChange}
+          />
+          <SettingToggle
+            checked={!snapshot.settings.welcomeCompleted}
+            disabled={busy}
+            label="显示欢迎页"
+            description="开启后会重新显示首次使用引导，可再次从引导中完成系统权限授权。"
+            onChange={(enabled) => onWelcomeCompletedChange(!enabled)}
           />
         </div>
       </section>
@@ -584,7 +752,7 @@ function TargetCandidateCard({
   candidate: MediaTargetCandidate;
   busy: boolean;
   onAddCustomApp: (candidateId: string, displayName: string) => void;
-  onSelect: (candidateId: string) => void;
+  onSelect: (candidate: MediaTargetCandidate) => void;
 }) {
   const [customName, setCustomName] = useState(candidate.appName);
   const unrecognized = candidate.recognition === 'unrecognized';
@@ -623,7 +791,7 @@ function TargetCandidateCard({
           </form>
         )}
       </div>
-      <button className="primary-outline-button candidate-select" type="button" disabled={busy} onClick={() => onSelect(candidate.id)}>
+      <button className="primary-outline-button candidate-select" type="button" disabled={busy} onClick={() => onSelect(candidate)}>
         {unrecognized ? '临时锁定' : '选择并锁定'}
       </button>
     </article>
@@ -645,7 +813,7 @@ function TargetPage({
   onClearTarget: () => void;
   onRemoveCustomApp: (customAppId: string) => void;
   onScan: (includeUnrecognized?: boolean) => void;
-  onSelect: (candidateId: string) => void;
+  onSelect: (candidate: MediaTargetCandidate) => void;
 }) {
   const discovery = snapshot.mediaTargets;
   const targetLocked = snapshot.target.status === 'locked';
@@ -680,7 +848,7 @@ function TargetPage({
         </p>
         {snapshot.target.focusProtection && (
           <button className="secondary-button" type="button" disabled={busy} onClick={onClearTarget}>
-            解除当前锁定
+            切换软件
           </button>
         )}
       </section>
@@ -702,7 +870,7 @@ function TargetPage({
         </div>
 
         {discovery.status === 'scanning' && <div className="target-empty-state" role="status">正在读取运行中的软件…</div>}
-        {discovery.status === 'idle' && <div className="target-empty-state">点击“开始扫描”查找演示和媒体软件。</div>}
+        {discovery.status === 'idle' && <div className="target-empty-state">软件启动后会自动检查播放进程，也可以手动重新扫描。</div>}
         {discovery.status === 'empty' && (
           <div className="target-empty-state">
             <strong>没有检测到可选择的窗口</strong>
@@ -798,7 +966,6 @@ function HomePage({
     : snapshot.permissionStatus === 'missing'
       ? '需要开启辅助功能权限'
       : '当前平台无需额外权限';
-  const statusText = snapshot.serviceError?.message || (isRunning ? '运行正常，暂无错误' : '服务当前未运行');
   const targetLocked = snapshot.target.status === 'locked';
   const targetLost = snapshot.target.status === 'lost';
   const targetWaiting = snapshot.target.status === 'waiting';
@@ -917,89 +1084,88 @@ function HomePage({
             <small>{targetWaiting ? '持续监控放映进程，开始播放后自动锁定' : targetLost ? '已停止发送按键，正在等待放映恢复' : targetLocked ? '软件失焦时将自动恢复窗口焦点' : '未运行的软件不会被锁定'}</small>
           </div>
           {snapshot.target.focusProtection && (
-            <button className="text-button danger-text" type="button" disabled={busy} onClick={onClearTarget}>解除</button>
+            <button className="text-button danger-text" type="button" disabled={busy} onClick={onClearTarget}>切换软件</button>
           )}
         </div>
       </article>
 
-      <article className="card compact-card page-mode-card">
-        <div className="compact-heading">
+      <section className="home-lower-layout" aria-label="首页信息与控制状态">
+        <article className="card author-card">
           <div>
-            <p className="eyebrow">控制偏好</p>
-            <h2>翻页模式</h2>
+            <p className="eyebrow">作者信息</p>
+            <h2>DeckTap</h2>
           </div>
-          <StatusIcon tone="blue" symbol="↕" />
-        </div>
-        <div className="segmented-control" aria-label="默认翻页模式">
-          <button
-            type="button"
-            aria-pressed={snapshot.pageTurnMode === 'vertical'}
-            className={snapshot.pageTurnMode === 'vertical' ? 'selected' : ''}
-            onClick={() => onPageModeChange('vertical')}
-          >
-            ↑↓ 上下翻页
-          </button>
-          <button
-            type="button"
-            aria-pressed={snapshot.pageTurnMode === 'horizontal'}
-            className={snapshot.pageTurnMode === 'horizontal' ? 'selected' : ''}
-            onClick={() => onPageModeChange('horizontal')}
-          >
-            ←→ 左右翻页
-          </button>
-        </div>
-        <p className="compact-note">变更后会同步到已连接的手机控制器</p>
-      </article>
+          <div className="author-profile-placeholder" aria-hidden="true">
+            <Logo />
+          </div>
+          <p>预留作者头像、名称和联系方式展示位置。</p>
+        </article>
 
-      <article className="card compact-card metric-card">
-        <div className="compact-heading">
-          <div>
-            <p className="eyebrow">实时状态</p>
-            <h2>已连接设备</h2>
-          </div>
-          <StatusIcon tone="blue" symbol="▯" />
-        </div>
-        <strong className="metric-value">{snapshot.connectedClients}<small> 台</small></strong>
-        <p className="compact-note">通过当前局域网连接</p>
-      </article>
+        <div className="home-right-panels">
+          <article className="card compact-card page-mode-card">
+            <div className="compact-heading">
+              <div>
+                <p className="eyebrow">控制偏好</p>
+                <h2>翻页模式</h2>
+              </div>
+              <StatusIcon tone="blue" symbol="↕" />
+            </div>
+            <div className="segmented-control" aria-label="默认翻页模式">
+              <button
+                type="button"
+                aria-pressed={snapshot.pageTurnMode === 'vertical'}
+                className={snapshot.pageTurnMode === 'vertical' ? 'selected' : ''}
+                onClick={() => onPageModeChange('vertical')}
+              >
+                ↑↓ 上下翻页
+              </button>
+              <button
+                type="button"
+                aria-pressed={snapshot.pageTurnMode === 'horizontal'}
+                className={snapshot.pageTurnMode === 'horizontal' ? 'selected' : ''}
+                onClick={() => onPageModeChange('horizontal')}
+              >
+                ←→ 左右翻页
+              </button>
+            </div>
+            <p className="compact-note">变更后会同步到已连接的手机控制器</p>
+          </article>
 
-      <article className="card compact-card metric-card">
-        <div className="compact-heading">
-          <div>
-            <p className="eyebrow">系统检查</p>
-            <h2>系统权限</h2>
-          </div>
-          <StatusIcon tone={snapshot.permissionStatus === 'missing' ? 'amber' : 'green'} symbol="✓" />
+          <article className="card status-summary-card">
+            <div className="compact-heading">
+              <div>
+                <p className="eyebrow">状态总览</p>
+                <h2>实时检查</h2>
+              </div>
+              <StatusIcon tone={snapshot.serviceError || snapshot.permissionStatus === 'missing' ? 'amber' : 'green'} symbol="✓" />
+            </div>
+            <div className="status-summary-grid">
+              <section className="status-summary-item">
+                <p className="eyebrow">实时状态</p>
+                <strong>{snapshot.connectedClients}<small> 台设备</small></strong>
+                <span>通过当前局域网连接</span>
+              </section>
+              <section className="status-summary-item">
+                <p className="eyebrow">系统检查</p>
+                <strong className={snapshot.permissionStatus === 'missing' ? 'permission-warning' : 'permission-good'}>
+                  {permissionText}
+                </strong>
+                <span>控制前会再次验证系统能力</span>
+                {snapshot.permissionStatus === 'missing' && (
+                  <div className="permission-actions">
+                    <button className="text-button" type="button" onClick={onOpenPermissionSettings}>
+                      打开辅助功能设置
+                    </button>
+                    <button className="text-button" type="button" onClick={onRefreshPermissions}>
+                      重新检测
+                    </button>
+                  </div>
+                )}
+              </section>
+            </div>
+          </article>
         </div>
-        <strong className={snapshot.permissionStatus === 'missing' ? 'permission-warning' : 'permission-good'}>
-          {permissionText}
-        </strong>
-        <p className="compact-note">控制前会再次验证系统能力</p>
-        {snapshot.permissionStatus === 'missing' && (
-          <div className="permission-actions">
-            <button className="text-button" type="button" onClick={onOpenPermissionSettings}>
-              打开辅助功能设置
-            </button>
-            <button className="text-button" type="button" onClick={onRefreshPermissions}>
-              重新检测
-            </button>
-          </div>
-        )}
-      </article>
-
-      <article className="card compact-card metric-card">
-        <div className="compact-heading">
-          <div>
-            <p className="eyebrow">诊断摘要</p>
-            <h2>最近状态</h2>
-          </div>
-          <StatusIcon tone={snapshot.serviceError ? 'amber' : 'green'} symbol="⌁" />
-        </div>
-        <strong className={snapshot.serviceError ? 'permission-warning' : 'status-good'}>{statusText}</strong>
-        <button className="text-button" type="button" onClick={() => void window.decktap.openLogFolder()}>
-          打开日志目录
-        </button>
-      </article>
+      </section>
     </div>
   );
 }
@@ -1012,6 +1178,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [dismissedSuggestionKey, setDismissedSuggestionKey] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -1061,11 +1228,17 @@ export function App() {
 
   if (!snapshot) return <LoadingScreen />;
 
-  const suggestedCandidate = snapshot.target.status !== 'locked'
-    && snapshot.target.status !== 'waiting'
-    && snapshot.mediaTargets.candidates.length > 0
-    ? snapshot.mediaTargets.candidates[0]
-    : null;
+  const permissionMissing = snapshot.permissionStatus === 'missing';
+  const suggestionCandidates = snapshot.target.status !== 'locked'
+    ? snapshot.mediaTargets.candidates.filter((candidate) => candidate.recognition !== 'unrecognized')
+    : [];
+  const suggestionKey = suggestionCandidates.map((candidate) => candidate.id).join('|');
+  const showWelcomeDialog = !snapshot.settings.welcomeCompleted;
+  const showCandidateDialog = !showWelcomeDialog
+    && !permissionMissing
+    && suggestionCandidates.length > 0
+    && suggestionKey !== dismissedSuggestionKey;
+  const candidateDialogMode = snapshot.target.status === 'waiting' || snapshot.target.status === 'lost' ? 'switch' : 'lock';
 
   const runAction = async (action: () => Promise<AppSnapshot>) => {
     setBusy(true);
@@ -1106,6 +1279,7 @@ export function App() {
   };
 
   const clearTarget = () => {
+    setDismissedSuggestionKey('');
     void runAction(() => window.decktap.clearTarget());
   };
 
@@ -1113,13 +1287,15 @@ export function App() {
     void runAction(() => window.decktap.scanMediaTargets(includeUnrecognized));
   };
 
-  const selectMediaTarget = (candidateId: string) => {
-    void runAction(() => window.decktap.selectMediaTarget(candidateId));
+  const selectMediaTarget = (candidate: MediaTargetCandidate) => {
+    const label = candidate.recognition === 'unrecognized' ? '临时锁定' : '锁定';
+    if (!window.confirm(`确认${label} ${candidate.appName}？锁定后手机翻页会发送到这个窗口。`)) return;
+    void runAction(() => window.decktap.selectMediaTarget(candidate.id));
   };
 
-  const lockSuggestedCandidate = () => {
-    if (!suggestedCandidate) return;
-    selectMediaTarget(suggestedCandidate.id);
+  const confirmSuggestedCandidate = (candidate: MediaTargetCandidate) => {
+    setDismissedSuggestionKey(suggestionKey);
+    void runAction(() => window.decktap.selectMediaTarget(candidate.id));
   };
 
   const quickLockMediaApp = async (ruleId: string) => {
@@ -1181,11 +1357,16 @@ export function App() {
   };
 
   const setCloseToTray = (enabled: boolean) => {
+    if (!enabled && !window.confirm('关闭后，点击窗口关闭按钮会退出 DeckTap 并停止手机控制服务。是否继续？')) return;
     void runAction(() => window.decktap.setCloseToTray(enabled));
   };
 
   const setLaunchAtLogin = (enabled: boolean) => {
     void runAction(() => window.decktap.setLaunchAtLogin(enabled));
+  };
+
+  const setWelcomeCompleted = (completed: boolean) => {
+    void runAction(() => window.decktap.setWelcomeCompleted(completed));
   };
 
   return (
@@ -1235,18 +1416,36 @@ export function App() {
         </header>
 
         {actionError && <div className="error-banner" role="alert">{actionError}</div>}
-        {suggestedCandidate && activePage !== 'target' && (
-          <div className="media-suggestion-banner" role="status">
+        {showWelcomeDialog && (
+          <WelcomeDialog
+            snapshot={snapshot}
+            busy={busy}
+            onComplete={() => setWelcomeCompleted(true)}
+            onOpenPermissionSettings={() => void openPermissionSettings()}
+            onRefreshPermissions={refreshPermissions}
+          />
+        )}
+        {showCandidateDialog && (
+          <MediaCandidateDialog
+            candidates={suggestionCandidates}
+            mode={candidateDialogMode}
+            busy={busy}
+            onClose={() => setDismissedSuggestionKey(suggestionKey)}
+            onConfirm={confirmSuggestedCandidate}
+          />
+        )}
+        {permissionMissing && (
+          <div className="permission-reminder-banner" role="alert">
             <div>
-              <strong>检测到可锁定软件：{suggestedCandidate.appName}</strong>
-              <span>{snapshot.mediaTargets.candidates.length > 1 ? `还有 ${snapshot.mediaTargets.candidates.length - 1} 个候选目标` : '可以锁定后再用手机翻页'}</span>
+              <strong>辅助功能权限未开启或已被撤销</strong>
+              <span>DeckTap 需要此权限才能恢复播放软件焦点并发送翻页按键。</span>
             </div>
             <div>
-              <button className="secondary-button" type="button" disabled={busy} onClick={() => setActivePage('target')}>
-                查看候选
+              <button className="secondary-button" type="button" disabled={busy} onClick={() => void openPermissionSettings()}>
+                打开系统设置
               </button>
-              <button className="primary-button" type="button" disabled={busy} onClick={lockSuggestedCandidate}>
-                锁定
+              <button className="primary-outline-button" type="button" disabled={busy} onClick={refreshPermissions}>
+                重新检测
               </button>
             </div>
           </div>
@@ -1300,6 +1499,7 @@ export function App() {
             onLaunchAtLoginChange={setLaunchAtLogin}
             onStartServiceOnLaunchChange={setStartServiceOnLaunch}
             onThemeChange={setTheme}
+            onWelcomeCompletedChange={setWelcomeCompleted}
           />
         )}
       </main>

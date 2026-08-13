@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('decktap', Object.freeze({
     enabled,
   ),
   setTheme: (themeSource) => ipcRenderer.invoke(IPC_CHANNELS.SET_THEME, themeSource),
+  setWelcomeCompleted: (completed) => ipcRenderer.invoke(IPC_CHANNELS.SET_WELCOME_COMPLETED, completed),
   startService: () => ipcRenderer.invoke(IPC_CHANNELS.START_SERVICE),
   stopService: () => ipcRenderer.invoke(IPC_CHANNELS.STOP_SERVICE),
   onSnapshotChanged(callback) {

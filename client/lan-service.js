@@ -53,6 +53,7 @@ function createLanService(options = {}) {
   const keyboardController = options.keyboardController;
   const getNetworkInterfaces = options.getNetworkInterfaces || os.networkInterfaces;
   const getControllerConfig = options.getControllerConfig || (() => ({ pageTurnMode: 'vertical' }));
+  const onControllerConfigChanged = options.onControllerConfigChanged || (() => {});
   const pairingManager = options.pairingManager || createPairingManager({ ttlMs: options.pairingTtlMs });
   const trustedClientStore = options.trustedClientStore || Object.freeze({
     clear: () => 0,
@@ -463,6 +464,44 @@ function createLanService(options = {}) {
     }
   }
 
+  function handleControllerSetting(socket, clientState, message, payloadBytes) {
+    if (
+      message.v !== PROTOCOL_VERSION
+      || message.type !== 'controller-setting'
+      || message.setting !== 'pageTurnMode'
+      || (message.value !== 'vertical' && message.value !== 'horizontal')
+    ) {
+      logger.warn('controller.setting.rejected', 'Rejected an invalid controller setting update.', {
+        clientId: clientState.clientId,
+        payloadBytes,
+        reason: 'invalid-setting-schema',
+      });
+      return;
+    }
+
+    try {
+      onControllerConfigChanged({ pageTurnMode: message.value, source: 'controller' });
+      logger.info('controller.setting.changed', 'A paired controller changed a shared setting.', {
+        clientId: clientState.clientId,
+        setting: message.setting,
+        value: message.value,
+      });
+      broadcastControllerConfig();
+      notifyChange();
+    } catch (error) {
+      logger.error('controller.setting.failed', 'A controller setting update could not be applied.', {
+        clientId: clientState.clientId,
+        error,
+        setting: message.setting,
+      });
+      sendJson(socket, {
+        v: PROTOCOL_VERSION,
+        type: 'command-rejected',
+        reason: 'control-failed',
+      });
+    }
+  }
+
   function handleMessage(socket, rawMessage, isBinary) {
     const clientState = clientStates.get(socket);
     if (!clientState) return;
@@ -480,6 +519,11 @@ function createLanService(options = {}) {
 
     if (!clientState.authenticated) {
       handlePairing(socket, clientState, parsed.message);
+      return;
+    }
+
+    if (parsed.message.type === 'controller-setting') {
+      handleControllerSetting(socket, clientState, parsed.message, rawMessage.length);
       return;
     }
 

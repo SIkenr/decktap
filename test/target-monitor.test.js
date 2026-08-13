@@ -48,3 +48,22 @@ test('target monitor does not enumerate while the locked target remains availabl
   assert.equal(result.target, target);
   assert.equal(rebindCalls, 0);
 });
+
+test('target monitor reports unresolved rebinding attempts on every poll', async () => {
+  let unresolvedCalls = 0;
+  const monitor = createTargetMonitor({
+    mediaTargetService: { async rebindRule() { return { outcome: 'not-running', ruleId: 'keynote' }; } },
+    targetWindowController: {
+      arm() {},
+      async checkAvailability() { return false; },
+      getStatus: () => 'waiting',
+      getTarget: () => null,
+    },
+    getRuleId: () => 'keynote',
+    onUnresolved() { unresolvedCalls += 1; },
+  });
+
+  assert.equal((await monitor.poll()).outcome, 'not-running');
+  assert.equal((await monitor.poll()).outcome, 'not-running');
+  assert.equal(unresolvedCalls, 2);
+});

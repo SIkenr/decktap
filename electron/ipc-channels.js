@@ -19,6 +19,7 @@ export const IPC_CHANNELS = Object.freeze({
   SET_LAUNCH_AT_LOGIN: 'decktap:set-launch-at-login',
   SET_START_SERVICE_ON_LAUNCH: 'decktap:set-start-service-on-launch',
   SET_THEME: 'decktap:set-theme',
+  SET_WELCOME_COMPLETED: 'decktap:set-welcome-completed',
   SCAN_MEDIA_TARGETS: 'decktap:scan-media-targets',
   SELECT_MEDIA_TARGET: 'decktap:select-media-target',
   SNAPSHOT_CHANGED: 'decktap:snapshot-changed',

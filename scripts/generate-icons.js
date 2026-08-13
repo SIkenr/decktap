@@ -79,28 +79,28 @@ function drawAppIcon(size) {
     for (let x = 0; x < size; x += 1) {
       const ux = (x + 0.5) / scale;
       const uy = (y + 0.5) / scale;
-      const shell = roundedRectAlpha(ux, uy, 160, 160, 704, 704, 172);
+      const shell = roundedRectAlpha(ux, uy, 64, 64, 896, 896, 246);
       if (shell <= 0) continue;
 
-      const linear = clamp((uy - 160 + (ux - 160) * 0.16) / 704);
+      const linear = clamp((uy - 64 + (ux - 64) * 0.16) / 896);
       let color = mixColor(blueTop, blueBottom, linear);
       color = mixColor(color, blueMid, 0.16);
       blendPixel(png, x, y, color, shell);
 
-      const stem = roundedRectAlpha(ux, uy, 418, 374, 96, 397, 20);
-      const outer = ellipseAlpha(ux, uy, 576, 573, 199, 199);
-      const inner = ellipseAlpha(ux, uy, 578, 573, 101, 115);
-      const rightMask = smoothstep(490, 526, ux);
+      const stem = roundedRectAlpha(ux, uy, 376, 330, 138, 364, 30);
+      const outer = ellipseAlpha(ux, uy, 570, 512, 224, 206);
+      const inner = ellipseAlpha(ux, uy, 573, 512, 112, 122);
+      const rightMask = smoothstep(490, 535, ux);
       const bowl = clamp(outer * rightMask - inner);
-      const cutTop = smoothstep(374, 457, uy);
-      const cutBottom = 1 - smoothstep(688, 771, uy);
+      const cutTop = smoothstep(330, 398, uy);
+      const cutBottom = 1 - smoothstep(626, 694, uy);
       const letterAlpha = clamp(Math.max(stem, bowl * cutTop * cutBottom));
       blendPixel(png, x, y, [255, 255, 255, 255], letterAlpha);
 
-      const signalOuter = ellipseAlpha(ux, uy, 731, 287, 67, 67);
-      const signalInner = ellipseAlpha(ux, uy, 731, 287, 43, 43);
+      const signalOuter = ellipseAlpha(ux, uy, 780, 244, 70, 70);
+      const signalInner = ellipseAlpha(ux, uy, 780, 244, 47, 47);
       const signalRing = clamp(signalOuter - signalInner);
-      const signalQuarter = signalOuter * smoothstep(731, 742, ux) * (1 - smoothstep(287, 298, uy));
+      const signalQuarter = signalOuter * smoothstep(780, 791, ux) * (1 - smoothstep(244, 255, uy));
       blendPixel(png, x, y, [255, 255, 255, 210], Math.max(signalRing, signalQuarter));
     }
   }
@@ -128,10 +128,12 @@ function drawTrayTemplate() {
 function renderSvgIcon(size) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'decktap-icon-'));
   try {
-    execFileSync('/usr/bin/qlmanage', ['-t', '-s', String(size), '-o', tempDir, SVG_SOURCE], {
+    const svgPath = path.join(tempDir, `icon-${size}-${process.pid}.svg`);
+    fs.copyFileSync(SVG_SOURCE, svgPath);
+    execFileSync('/usr/bin/qlmanage', ['-t', '-s', String(size), '-o', tempDir, svgPath], {
       stdio: 'ignore',
     });
-    const renderedPath = path.join(tempDir, 'icon.svg.png');
+    const renderedPath = `${svgPath}.png`;
     return applyAppIconMask(fs.readFileSync(renderedPath), size);
   } catch {
     return null;
@@ -147,7 +149,7 @@ function applyAppIconMask(buffer, size) {
     for (let x = 0; x < png.width; x += 1) {
       const ux = (x + 0.5) / scale;
       const uy = (y + 0.5) / scale;
-      const shell = roundedRectAlpha(ux, uy, 160, 160, 704, 704, 172);
+      const shell = roundedRectAlpha(ux, uy, 64, 64, 896, 896, 246);
       const index = (y * png.width + x) * 4;
       if (shell <= 0) {
         png.data[index + 3] = 0;
@@ -159,8 +161,44 @@ function applyAppIconMask(buffer, size) {
   return PNG.sync.write(png);
 }
 
+function downsamplePng(buffer, outputSize, factor) {
+  if (factor <= 1) return buffer;
+  const source = PNG.sync.read(buffer);
+  const output = new PNG({ width: outputSize, height: outputSize });
+  for (let y = 0; y < outputSize; y += 1) {
+    for (let x = 0; x < outputSize; x += 1) {
+      let alpha = 0;
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      for (let sampleY = 0; sampleY < factor; sampleY += 1) {
+        for (let sampleX = 0; sampleX < factor; sampleX += 1) {
+          const sourceIndex = (((y * factor + sampleY) * source.width) + (x * factor + sampleX)) * 4;
+          const sampleAlpha = source.data[sourceIndex + 3] / 255;
+          alpha += sampleAlpha;
+          red += source.data[sourceIndex] * sampleAlpha;
+          green += source.data[sourceIndex + 1] * sampleAlpha;
+          blue += source.data[sourceIndex + 2] * sampleAlpha;
+        }
+      }
+      const samples = factor * factor;
+      const outputAlpha = alpha / samples;
+      const outputIndex = (y * output.width + x) * 4;
+      if (outputAlpha > 0) {
+        output.data[outputIndex] = Math.round(red / alpha);
+        output.data[outputIndex + 1] = Math.round(green / alpha);
+        output.data[outputIndex + 2] = Math.round(blue / alpha);
+      }
+      output.data[outputIndex + 3] = Math.round(outputAlpha * 255);
+    }
+  }
+  return PNG.sync.write(output);
+}
+
 function renderIcon(size) {
-  return renderSvgIcon(size) || drawAppIcon(size);
+  const factor = size <= 256 ? 4 : size <= 512 ? 2 : 1;
+  const renderedSvg = renderSvgIcon(size * factor);
+  return downsamplePng(renderedSvg || drawAppIcon(size * factor), size, factor);
 }
 
 function writeIcns(entries, outputPath) {
